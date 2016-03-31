@@ -2,16 +2,16 @@ Our entire pipeline works as follows.
 
 1. Constructing dictionary and document record ["dictionary.txt" and "documentRecord.dat"]
 
-* Run the "TopicModeling.java"
-* Dictionary and document record is created using dataset located at "./data/bbc/"
-* In this phase, "dictionaryWithFrequency.txt" file is also generated
+  * Run the "TopicModeling.java"
+  * Dictionary and document record is created using dataset located at "./data/bbc/"
+  * In this phase, "dictionaryWithFrequency.txt" file is also generated
 
 2. Run topic model using LDA-C
 
-* Double click the "run.bat" file, topic model will be generated and stored in "./topic_model/" folder
-* Command used to generate topic model is "lda-win64 est 0.6 5 settings.txt documentRecord.dat seeded topic_model"
-* Third parameter value ("5") in the command represents "number of topics"
-* "settings.txt" file contains all required parameter values
+  * Double click the "run.bat" file, topic model will be generated and stored in "./topic_model/" folder
+  * Command used to generate topic model is "lda-win64 est 0.6 5 settings.txt documentRecord.dat seeded topic_model"
+  * Third parameter value ("5") in the command represents "number of topics"
+  * "settings.txt" file contains all required parameter values
 
 3. Generate "query.dat" file
 
