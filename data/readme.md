@@ -8,4 +8,4 @@ To execute the core part of the entire pipeline, we need some pre-generated data
   * 5 different topics are business, entertainment, politics, sport and technology 
 * [BBC dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFQnZiTHE3ZUt1RWc/view?usp=sharing)
 
-Required external libraries can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFRzZKbXFxUS1tUXM/view?usp=sharing)
+Required external libraries can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFRzZKbXFxUS1tUXM/view?usp=sharing).
