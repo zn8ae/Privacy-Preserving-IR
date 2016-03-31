@@ -24,19 +24,13 @@ Our entire pipeline works as follows.
 * Run the "GenerateTopicWords.java"
 * Each topic repo (say, "./topic_repo/topic 0.txt") contains all the respective topic specific words and their likelihood
 
-5. Crawling entire AOL data
-
-* Run the "Controller.java"
-* URLs are used from "./data/urls/" for crawling ["urls_part01.txt", "urls_part02.txt", "urls_part03.txt", "urls_part04.txt"]
-* Store the crawled data at "./data/crawled_data/" ["crawledData_part01.txt", "crawledData_part02.txt", "crawledData_part03.txt", "crawledData_part04.txt"]
-
-6. Generate user profile for top k users
+5. Generate user profile for top k users
 
 * Run the "ProfileBuilder.java"
 * User profile will be generated for training and testing 
 * User profiles are stored at "./data/user_profiles/train/" and "./data/user_profiles/test/"
 
-7. Finally either run "Evaluate.java" or "Runner.java"
+6. Finally either run "Evaluate.java" or "Runner.java"
 
 * "Evaluate.java" - run to evaluate our entire pipeline
 * "Runner.java" - run for interactive searching
