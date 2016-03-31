@@ -1,2 +1,1 @@
-# Privacy-Preserving-IR
-Privacy preserving information retrieval
+# Privacy preserving information retrieval
