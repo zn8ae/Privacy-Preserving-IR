@@ -7,3 +7,5 @@ To execute the core part of the entire pipeline, we need some pre-generated data
 * [Word distribution for 5 different topic](https://drive.google.com/a/virginia.edu/folderview?id=0B8ZGlkqDw7hFWkpZQ1lrd1BmUWM&usp=sharing)
   * 5 different topics are business, entertainment, politics, sport and technology 
 * [BBC dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFQnZiTHE3ZUt1RWc/view?usp=sharing)
+
+Required external libraries can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFRzZKbXFxUS1tUXM/view?usp=sharing)
