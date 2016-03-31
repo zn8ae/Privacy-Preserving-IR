@@ -15,22 +15,22 @@ Our entire pipeline works as follows.
 
 3. Generate "query.dat" file
 
-* Don't need to run any specific java file
-* When you run "Evaluate.java" or "Runner.java", it calls "initializeGeneration" function from "QueryTopicInference.java" for every user
-* "query.dat" file contains information about all the queries of a particular user
+ * Don't need to run any specific java file
+ * When you run "Evaluate.java" or "Runner.java", it calls "initializeGeneration" function from "QueryTopicInference.java" for every user
+ * "query.dat" file contains information about all the queries of a particular user
 
 4. Generate topic specific words and store them in "./topic_repo/"
 
-* Run the "GenerateTopicWords.java"
-* Each topic repo (say, "./topic_repo/topic 0.txt") contains all the respective topic specific words and their likelihood
+ * Run the "GenerateTopicWords.java"
+ * Each topic repo (say, "./topic_repo/topic 0.txt") contains all the respective topic specific words and their likelihood
 
 5. Generate user profile for top k users
 
-* Run the "ProfileBuilder.java"
-* User profile will be generated for training and testing 
-* User profiles are stored at "./data/user_profiles/train/" and "./data/user_profiles/test/"
+ * Run the "ProfileBuilder.java"
+ * User profile will be generated for training and testing 
+ * User profiles are stored at "./data/user_profiles/train/" and "./data/user_profiles/test/"
 
 6. Finally either run "Evaluate.java" or "Runner.java"
 
-* "Evaluate.java" - run to evaluate our entire pipeline
-* "Runner.java" - run for interactive searching
+ * "Evaluate.java" - run to evaluate our entire pipeline
+ * "Runner.java" - run for interactive searching
