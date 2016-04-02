@@ -1,1 +1,13 @@
 
+To execute the core part of the entire pipeline, we need some pre-generated data which can be found below.
+
+* [AOL dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFenhocnpLZkQ0am8/view?usp=sharing)
+  * AOL dataset details can be found [here](http://www.researchpipeline.com/mediawiki/index.php?title=AOL_Search_Query_Logs)
+* All the alive url from AOL query log can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFYTA4UC1Hdm1CckU/view?usp=sharing). We found this list after crawling all the url in AOL query log. Complete url list can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFNkc0c0p1OVF2YTA/view?usp=sharing)
+* [Lucene AOL index](https://drive.google.com/a/virginia.edu/folderview?id=0B8ZGlkqDw7hFV2trYW9ETmo4cGc&usp=sharing)
+* [Topic Model on BBC dataset](https://drive.google.com/a/virginia.edu/folderview?id=0B8ZGlkqDw7hFcVZSVW9rSzVZVDA&usp=sharing)
+* [Word distribution for 5 different topic](https://drive.google.com/a/virginia.edu/folderview?id=0B8ZGlkqDw7hFWkpZQ1lrd1BmUWM&usp=sharing)
+  * 5 different topics are business, entertainment, politics, sport and technology 
+* [BBC dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFQnZiTHE3ZUt1RWc/view?usp=sharing)
+
+Required external libraries can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFRzZKbXFxUS1tUXM/view?usp=sharing).
