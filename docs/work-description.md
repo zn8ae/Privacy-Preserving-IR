@@ -3,14 +3,14 @@
 
 Requirement: [BBC dataset](http://mlg.ucd.ie/datasets/bbc.html), [Binary for LDA-C](https://github.com/magsilva/lda-c/tree/master/bin), [Settings file](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/settings.txt) to set parameters for LDA
 
-1. Constructing dictionary and document record
-  * Run the "BuildTopicModel.java"
+### Step. 1 - Constructing dictionary and document record
+  * Run [BuildTopicModel.java](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/src/edu/virginia/cs/model/BuildTopicModel.java)
   * Dictionary and document record will be created using BBC dataset
     + BBC dataset should be located at - **project_root_directory]/data/bbc/**
     + Dictionary ("dictionary.txt") and document record ("documentRecord.dat") will be placed at the project root directory
   * This step also generated "dictionaryWithFrequency.txt" file and placed at the project root directory
 
-### File description:
+**File description**:
   * dictionary.txt: This file contains unigrams and bigrams found in the BBC dataset. Each line contains one unigram/bigram.
   * documentRecord.dat:
   <pre>
@@ -20,7 +20,7 @@ Requirement: [BBC dataset](http://mlg.ucd.ie/datasets/bbc.html), [Binary for LDA
   </pre>
   * dictionaryWithFrequency.txt: This file contains unigrams and bigrams with their total term frequency over the entire BBC dataset.     Each line contains one unigram/bigram and corresponding total term frequency seperated by space.
 
-2. Generate the topic model using LDA-C
+### Step. 2 - Generate the topic model using LDA-C
 
   * Double click the [run.bat](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/run-lda.bat) file (for windows environment), topic model will be generated and stored in **project_root_directory]/topic_model/** folder
   * Command written in [run.bat](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/run-lda.bat) file is **lda-win64 est 0.6 5 settings.txt documentRecord.dat seeded topic_model**
