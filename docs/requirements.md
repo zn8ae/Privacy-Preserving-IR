@@ -2,7 +2,7 @@
 
 * [AOL dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFenhocnpLZkQ0am8/view?usp=sharing)
   * AOL dataset details can be found [here](http://www.researchpipeline.com/mediawiki/index.php?title=AOL_Search_Query_Logs)
-* [BBC dataset](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFQnZiTHE3ZUt1RWc/view?usp=sharing)
+* [BBC dataset](http://mlg.ucd.ie/datasets/bbc.html)
   * Consists of 2225 documents from the BBC news website corresponding to stories in five topical areas from 2004-2005.
   * Class Labels: 5 (business, entertainment, politics, sport, tech) 
 
