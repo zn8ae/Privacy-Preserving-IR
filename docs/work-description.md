@@ -1,18 +1,33 @@
 
-Our entire pipeline works as follows.
+## Generating Topic Model
 
-1. Constructing dictionary and document record ["dictionary.txt" and "documentRecord.dat"]
+Requirement: [BBC dataset](http://mlg.ucd.ie/datasets/bbc.html), [Binary for LDA-C](https://github.com/magsilva/lda-c/tree/master/bin), [Settings file](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/settings.txt) to set parameters for LDA
 
+1. Constructing dictionary and document record
   * Run the "BuildTopicModel.java"
-  * Dictionary and document record is created using dataset located at "./data/bbc/"
-  * In this phase, "dictionaryWithFrequency.txt" file is also generated
+  * Dictionary and document record will be created using BBC dataset
+    + BBC dataset should be located at - **project_root_directory]/data/bbc/**
+    + Dictionary ("dictionary.txt") and document record ("documentRecord.dat") will be placed at the project root directory
+  * This step also generated "dictionaryWithFrequency.txt" file and placed at the project root directory
 
-2. Run topic model using LDA-C
+### File description:
+  * dictionary.txt: This file contains unigrams and bigrams found in the BBC dataset. Each line contains one unigram/bigram.
+  * documentRecord.dat:
+  <pre>
+   350 501:1 530:1 723:1 443:1 598:1 621:1 707:1 561:1 591:1 490:1 483:1 487:1 438:1 688:1 573:1 604:1 471:2
+   31:1 627:1 682:1 477:4 603:1 607:1 562:3 698:1 474:1 544:1 656:1 472:1 457:1 513:1 413:1 410:1 3:1 
+   632:1 569:1 488:1 499:1 599:1 439:1 401:7 595:2 713:1 526:1 648:1 179:1 626:1 518:3 655:1 524:1 624:1 
+  </pre>
+  * dictionaryWithFrequency.txt: This file contains unigrams and bigrams with their total term frequency over the entire BBC dataset.     Each line contains one unigram/bigram and corresponding total term frequency seperated by space.
 
-  * Double click the "run.bat" file, topic model will be generated and stored in "./topic_model/" folder
-  * Command used to generate topic model is "lda-win64 est 0.6 5 settings.txt documentRecord.dat seeded topic_model"
-  * Third parameter value ("5") in the command represents "number of topics"
-  * "settings.txt" file contains all required parameter values
+2. Generate the topic model using LDA-C
+
+  * Double click the [run.bat](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/run-lda.bat) file (for windows environment), topic model will be generated and stored in **project_root_directory]/topic_model/** folder
+  * Command written in [run.bat](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/run-lda.bat) file is **lda-win64 est 0.6 5 settings.txt documentRecord.dat seeded topic_model**
+  * Third parameter value ("5") in the command represents "number of topics" for the topic model
+  * [settings.txt](https://github.com/wasiuva/Privacy-Preserving-IR/blob/master/settings.txt) file should contain all required parameter values
+
+### Generating Topic Model
 
 3. Generate "query.dat" file
 
