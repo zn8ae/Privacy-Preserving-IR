@@ -3,7 +3,7 @@ Our entire pipeline works as follows.
 
 1. Constructing dictionary and document record ["dictionary.txt" and "documentRecord.dat"]
 
-  * Run the "TopicModeling.java"
+  * Run the "BuildTopicModel.java"
   * Dictionary and document record is created using dataset located at "./data/bbc/"
   * In this phase, "dictionaryWithFrequency.txt" file is also generated
 
@@ -29,7 +29,7 @@ Our entire pipeline works as follows.
 
  * Run the "ProfileBuilder.java"
  * User profile will be generated for training and testing 
- * User profiles are stored at "./data/user_profiles/train/" and "./data/user_profiles/test/"
+ * User profiles are stored at "./data/user_profiles/"
 
 6. Finally either run "Evaluate.java" or "Runner.java"
 
