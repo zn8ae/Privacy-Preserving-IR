@@ -13,7 +13,6 @@ import edu.virginia.cs.user.UserProfile;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -25,48 +24,78 @@ import java.util.logging.Logger;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.Version;
-import edu.virginia.cs.model.GenerateQuery;
+import edu.virginia.cs.model.GenerateCoverQuery;
 import edu.virginia.cs.model.QueryTopicInference;
 import edu.virginia.cs.utility.FileOperations;
 import edu.virginia.cs.utility.StringTokenizer;
 
 public class Evaluate {
 
-    private final String _judgeFile = "./data/second_top_150_user_profiles/";
+    /* folder path where a specified number of user's search log is present */
+    private final String _judgeFile = "./data/user_profiles/";
+    /* folder path where the AOL index is located */
     private final String _indexPath = "lucene-AOL-index";
-    final static String _userProfileDir = "./data/user_profiles/";
+    /* Searcher class object to search for results of a user query */
     private Searcher _searcher = null;
+    /* Storing a specific user's queries and corresponding all clicked documents */
     private HashMap<String, ArrayList<String>> mappingQueryToURL;
-    private ArrayList<String> allQueries;
-    private ArrayList<String> allQueryProbab;
-    private GenerateQuery gQuery;
-    private UserProfile uProfile; // client side user profile
-    private ReferenceModel refUserModel;
-//    private SpecialAnalyzer analyzer;
+    /* Storing a specific user's all queries */
+    private ArrayList<String> listOfUserQuery;
+    /* Storing a specific user's all queries */
+    private ArrayList<String> listOfCoverQuery;
+    /* Storing a specific user's all query probabilities. One query will have n 
+     different  probability values for n different topics assigned by the topic model */
+    private ArrayList<String> allQueryTopocProb;
+    /* Object to generate cover queries for a specific user query */
+    private GenerateCoverQuery gCoverQuery;
+    /* User profile which is constructed and maintained in the client side */
+    private UserProfile uProfile;
+    /* Reference model to smooth language model while generating the cover queries */
+    private HashMap<String, Float> referenceModel;
+    /* Total MAP for 'n' users that we are evaluating, ex. in our case, n = 250 */
     private double totalMAP = 0.0;
+    /* Total number of queries evaluated for 'n' users, ex. in our case, n = 250 */
     private double totalQueries = 0.0;
-
-    HashMap<String, Float> tempRefModel;
-    HashMap<String, Integer> tempRefToken;
-
-    //for semantic evaluation
-    private ArrayList<String> origQueryR;
-    private ArrayList<String> coverQueryR;
-    private SemanticEvaluation semEval;
-//    private SemanticCoverQuery semanticQuery;
-    private int countUsers = 0;
+    /* Total KL-Divergence for 'n' users that we are evaluating, ex. in our case, n = 250 */
     private double totalKL = 0;
+    /* Total mutual information for 'n' users that we are evaluating, ex. in our case, n = 250 */
     private double totalMI = 0;
+    /* For calculating mutual information */
+    private final SemanticEvaluation semEval;
+    /* First parameter of our approach, Entropy range */
+    private final double entropyRange;
+    /* Second parameter of our approach, number of cover query for each user query */
+    private final int numOfCoverQ;
+    /* Query parser used to parse user query */
+    private final QueryParser parser;
 
-    private double entropyRange;
-    private int numOfCoverQ;
+    public Evaluate() {
+        gCoverQuery = new GenerateCoverQuery();
+        // setting entropy range for our model
+        entropyRange = 0.2;
+        // setting number of cover query that will be generated for each user query
+        numOfCoverQ = 2;
 
-    //writer
-    FileWriter rout;
+        parser = new QueryParser(Version.LUCENE_46, "", new SpecialAnalyzer());
+        _searcher = new Searcher(_indexPath);
+        // setting the flag to enable personalization
+        _searcher.activatePersonalization(true);
 
-    private void generateJudgement(String userId) {
+        // initialization for Mutual Information calculation
+        semEval = new SemanticEvaluation();
+        semEval.initDSMinfo();
+    }
+
+    /**
+     * Method that generates a mapping between each user query and corresponding
+     * clicked documents.
+     *
+     * @param userId
+     * @throws java.lang.Throwable
+     */
+    private void createUserJudgements(String userId) {
         mappingQueryToURL = new HashMap<>();
-        allQueries = new ArrayList<>();
+        listOfUserQuery = new ArrayList<>();
         String judgeFile = _judgeFile + userId + ".txt";
         BufferedReader br;
         try {
@@ -79,104 +108,123 @@ public class Evaluate {
                     tempList = mappingQueryToURL.get(query);
                 } else {
                     tempList = new ArrayList<>();
+                    listOfUserQuery.add(query);
                 }
                 tempList.add(relDoc);
                 mappingQueryToURL.put(query, tempList);
-                allQueries.add(query);
             }
         } catch (Exception ex) {
             Logger.getLogger(Evaluate.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
-    private void fakeQueryGeneration(String userId) throws IOException {
+    /**
+     * Method that initializes required things for the cover query generation
+     * procedure.
+     *
+     * @throws java.File.IOException
+     */
+    private void intializeCoverQueryGeneration() throws IOException {
         uProfile = new UserProfile();
-        uProfile.setReferenceModel(tempRefModel);
-        uProfile.setReferenceToken(tempRefToken);
+        uProfile.setReferenceModel(referenceModel);
 
-//        uProfile.createUserProfile(_userProfileDirTrain, userId); //removing for ignore training data
         QueryTopicInference qti = new QueryTopicInference();
-        qti.initializeGeneration(allQueries);
+        qti.initializeGeneration(listOfUserQuery);
 
-        gQuery = new GenerateQuery();
-        gQuery.setEntropy(entropyRange);
-        gQuery.loadTopicWords("topic_repo");
-        allQueryProbab = new ArrayList<>();
-        FileOperations fiop = new FileOperations();
-        allQueryProbab = fiop.LoadFile("result-gamma.dat", -1);
+        gCoverQuery = new GenerateCoverQuery();
+        gCoverQuery.setEntropy(entropyRange);
+        // load all the words and their probability distribution for each topic
+        gCoverQuery.loadTopicWords("topic_repo");
+
+        allQueryTopocProb = new ArrayList<>();
+        // load topic probabilities for user queries
+        allQueryTopocProb = new FileOperations().LoadFile("result-gamma.dat", -1);
     }
 
+    /**
+     * Method that generates the reference model using all user's search log, it
+     * needs to be executed once only. Reference model is stored, so that it can
+     * be used for future use.
+     *
+     * @throws java.lang.Throwable
+     */
     private void createRefModel() throws Throwable {
-        refUserModel = new ReferenceModel();
-        refUserModel.createReferenceModel(_userProfileDir); //create reference model
-        tempRefModel = refUserModel.getReferenceModel();
-//        tempRefToken = refUserModel.getReferenceToken();
-        FileOperations fiop = new FileOperations();
-        fiop.storeHashMapInFile("./data/reference_model.txt", tempRefModel);
+        ReferenceModel refUserModel = new ReferenceModel();
+        refUserModel.createReferenceModel(_judgeFile);
+        HashMap<String, Float> refModel = refUserModel.getReferenceModel();
+        new FileOperations().storeHashMapInFile("./data/reference_model.txt", refModel);
     }
 
+    /**
+     * Method to load the reference model which is generated previously.
+     *
+     * @throws java.lang.Throwable
+     */
     private void loadRefModel() throws Throwable {
-        tempRefModel = new HashMap<>();
-        tempRefToken = new HashMap<>();
+        referenceModel = new HashMap<>();
         FileOperations fiop = new FileOperations();
         ArrayList<String> lines = fiop.LoadFile("./data/reference_model.txt", -1);
         for (String line : lines) {
             line = line.trim();
             String[] words = line.split(" ");
-            if (words.length == 2) {
-                tempRefModel.put(words[0], Float.valueOf(words[1]));
-                tempRefToken.put(words[0], 0);
-            } else if (words.length == 3) {
-                tempRefModel.put(words[0] + " " + words[1], Float.valueOf(words[2]));
-                tempRefToken.put(words[0] + " " + words[1], 0);
+            if (words.length == 2) { // for unigrams in the reference model
+                referenceModel.put(words[0], Float.valueOf(words[1]));
+            } else if (words.length == 3) { // for bigrams in the reference model
+                referenceModel.put(words[0] + " " + words[1], Float.valueOf(words[2]));
             }
         }
-//        System.out.println("Reference Model Size - " + tempRefModel.size());
     }
 
+    /**
+     * Main method that executes the entire pipeline.
+     *
+     * @param args command line arguments
+     * @throws java.lang.Throwable
+     */
     private void startEval() throws Throwable {
-        gQuery = new GenerateQuery();
-        entropyRange = 0.2;
-        numOfCoverQ = 2;
-
-        //write original and cover query
-        rout = new FileWriter("queryLogsTopic.txt");
-
-        QueryParser parser = new QueryParser(Version.LUCENE_46, "", new SpecialAnalyzer());
-        String method = "--ok";//specify the ranker you want to test
-        _searcher = new Searcher(_indexPath);
-        _searcher.activatePersonalization(true); // activate personalized search
-
-        semEval = new SemanticEvaluation();
-        semEval.initDSMinfo();
         loadRefModel();
-        ArrayList<String> allUserId = getAllUserIds(_judgeFile);
+        ArrayList<String> allUserId = getAllUserId(_judgeFile);
+        int countUsers = 0;
         for (String userId : allUserId) {
             countUsers++;
+
+            // initializing user profile of the server side and setting the reference model
             _searcher.initializeUserProfile();
-            _searcher.getUserProfile().setReferenceModel(tempRefModel);
-            _searcher.getUserProfile().setReferenceToken(tempRefToken);
+            _searcher.getUserProfile().setReferenceModel(referenceModel);
 
-            //semantic evaluation
-            origQueryR = new ArrayList<>();
-            coverQueryR = new ArrayList<>();
+            // required for calculating mutual information between user queris and cover queries
+            listOfUserQuery = new ArrayList<>();
+            listOfCoverQuery = new ArrayList<>();
 
-            generateJudgement(userId);
-            fakeQueryGeneration(userId);
-            int k = 10;
-            double meanAvgPrec = 0.0, nDCG = 0.0;
-            double numQueries = 0.0;
-            int qCount = 0;
-            int foundQ = 0;
+            // generate the clicked urls for evaluation
+            createUserJudgements(userId);
+            // initialization for cover query generation
+            intializeCoverQueryGeneration();
+
+            double meanAvgPrec = 0.0;
+            // Number of queries that have non-zero result set
+            double numQueries = 0;
+            // index of the user query
+            int queryIndex = 0;
+
             for (String query : mappingQueryToURL.keySet()) {
                 ArrayList<String> relDocs = new ArrayList<>();
-                ArrayList<String> tempDocs = mappingQueryToURL.get(query);
-                Query textQuery = parser.parse(parser.escape(query));
+                ArrayList<String> clickedDocs = mappingQueryToURL.get(query);
+
+                Query textQuery = parser.parse(QueryParser.escape(query));
                 String[] qParts = textQuery.toString().split(" ");
-                for (String relDoc : tempDocs) {
+
+                /**
+                 * Checking whether a user query and clicked documents are
+                 * actually relevant or not! For example, "american idol season
+                 * one" is no longer related to www.tv.com.
+                 *
+                 */
+                for (String relDoc : clickedDocs) {
                     String docContent = _searcher.search(relDoc, "clicked_url");
                     HashSet<String> tokSet = new HashSet<>(StringTokenizer.TokenizeString(docContent));
                     int tokMatched = 0;
+
                     for (String part : qParts) {
                         if (tokSet.contains(part)) {
                             tokMatched++;
@@ -186,169 +234,214 @@ public class Evaluate {
                         relDocs.add(relDoc);
                     }
                 }
+
+                /**
+                 * If a user query has at least one corresponding clicked
+                 * document, then we evaluate it, otherwise not.
+                 *
+                 */
                 if (relDocs.size() > 0) {
                     String judgement = "";
                     for (String doc : relDocs) {
                         judgement += doc + " ";
                     }
-                    //compute corresponding AP
-                    double temp = AvgPrec(query, judgement, (int) qCount);
-                    meanAvgPrec += temp;
+                    // computing average precision for a query
+                    double avgPrec = AvgPrec(query, judgement, queryIndex);
+                    meanAvgPrec += avgPrec;
                     ++numQueries;
                 }
-                qCount++;
+                queryIndex++;
             }
+
+            // totalMAP = sum of all MAP computed for queries of 'n' users
             totalMAP += meanAvgPrec;
+            // totalQueries = total number of queries for 'n' users
             totalQueries += numQueries;
-            double divergence3 = (double) _searcher.getUserProfile().calculateKLDivergence(uProfile.getUserProfile(), uProfile.totalTokens);//give total token to calcualte token prob on the fly
-            totalKL += divergence3;
+            // give the number of tokens to calcualte token probability on the fly
+            double klDivergence = (double) _searcher.getUserProfile().calculateKLDivergence(uProfile.getUserProfile(), uProfile.totalTokens);
+            totalKL += klDivergence;
+            // compute MAP for the current user
             double MAP = meanAvgPrec / numQueries;
-            double mutualInfo = semEval.calculatePEL(origQueryR, coverQueryR);
+            // compute mutual information for the current user
+            double mutualInfo = semEval.calculatePEL(listOfUserQuery, listOfCoverQuery);
+            // totalMI = sum of all MI computed for 'n' users
             totalMI += mutualInfo;
-            System.out.printf("%-8d\t%-8d\t%-8f\t%.8f\t%.8f\n", countUsers, Integer.parseInt(userId), MAP, divergence3, mutualInfo);
+
+            System.out.printf("%-8d\t%-8d\t%-8f\t%.8f\t%.8f\n", countUsers, Integer.parseInt(userId), MAP, klDivergence, mutualInfo);
         }
 
         double avgKL = 0;
         double avgMI = 0;
+        double finalMAP = totalMAP / totalQueries;
         if (countUsers > 0) {
             avgKL = totalKL / countUsers;
             avgMI = totalMI / countUsers;
         }
-        double finalMAP = totalMAP / totalQueries;
-        System.out.println("\n************Final Results**************");
-        System.out.println("\nTotal Users : " + countUsers);
-        System.out.println("Total Quries : " + totalQueries);
-        System.out.printf("\nFinal Map : %-8f\n", finalMAP);
+
+        System.out.println("\n************Result after full pipeline execution for n users**************");
+        System.out.println("\nTotal number of users : " + countUsers);
+        System.out.println("Total number of quries tested : " + totalQueries);
+        System.out.println("Map : " + finalMAP);
         System.out.println("Average KL : " + avgKL);
         System.out.println("Average MI : " + avgMI);
 
-        rout.close();
     }
 
+    /**
+     * Main method from where execution begins.
+     *
+     * @param args command line arguments
+     * @throws java.lang.Throwable
+     */
     public static void main(String[] args) throws Throwable {
         Evaluate eval = new Evaluate();
         eval.startEval();
     }
 
-    private double AvgPrec(String query, String docString, int index) throws Throwable {
-        //add to original query
-        //write query to file
-        int nCoverQuery = numOfCoverQ;
-        origQueryR.add(query);
-
-//        fakeQueries = new ArrayList<>();
-        ArrayList<String> fakeQueries = gQuery.generateNQueries(allQueryProbab.get(index), nCoverQuery, uProfile.getAvgQueryLength());
-        //change here for cover query
-//        ArrayList<String> fakeQueries = semanticQuery.getCoverQueries(query, 1, 10);//semantic query generation
+    /**
+     * Method that computes average precision of a user submitted query.
+     *
+     * @param query user's original query
+     * @param clickedDocs clicked documents for the true user query
+     * @param index index of the user query
+     * @return average precision
+     */
+    private double AvgPrec(String query, String clickedDocs, int index) throws Throwable {
+        // generating the cover queries
+        ArrayList<String> coverQueries = gCoverQuery.generateNQueries(allQueryTopocProb.get(index), numOfCoverQ, uProfile.getAvgQueryLength());
         double avgp = 0.0;
-//        fakeQueries.add(canQ);
-        int randNum = (int) (Math.random() * fakeQueries.size());
-//        rout.write(query + "\n");
-        for (int k = 0; k < fakeQueries.size(); k++) {
-//            rout.write(fakeQueries.get(k) + "\n");
-            coverQueryR.add(fakeQueries.get(k));
-            // sending fake queries to search engine
-            ArrayList<ResultDoc> searchResults = _searcher.search(fakeQueries.get(k)).getDocs();
-            // generating fake clicks for fake queries
+        int randNum = (int) (Math.random() * coverQueries.size());
+
+        for (int k = 0; k < coverQueries.size(); k++) {
+            listOfCoverQuery.add(coverQueries.get(k));
+            // submitting cover query to the search engine
+            ArrayList<ResultDoc> searchResults = _searcher.search(coverQueries.get(k)).getDocs();
+            // generating fake clicks for the cover queries
+            // one click per cover query
             if (!searchResults.isEmpty()) {
                 int rand = (int) (Math.random() * searchResults.size());
                 ResultDoc rdoc = searchResults.get(rand);
-                _searcher.updateUProfileUsingClickedDoc(rdoc.content());
+                // update user profile kept in the server side
+                _searcher.updateUProfileUsingClickedDocument(rdoc.content());
             }
-            // sending original user query to search engine
+
+            // submitting the original user query to the search engine
             if (k == randNum) {
-//                ArrayList<ResultDoc> results = _searcher.search(query).getDocs();
                 ArrayList<ResultDoc> results = _searcher.search(query).getDocs(); // for Plausible Deniable Search
-                //add original query to cover query for our approach
-//                coverQueryR.add(query); //for Semantic not include original in the cover
-                coverQueryR.add(query);
                 if (results.isEmpty()) {
                     continue;
                 }
 
                 // re-rank the results based on the user profile kept in client side
-//                results = reRankResults(results);
-                HashSet<String> relDocs = new HashSet<>(Arrays.asList(docString.split(" ")));
+                results = reRankResults(results);
+
+                HashSet<String> relDocs = new HashSet<>(Arrays.asList(clickedDocs.split(" ")));
                 int i = 1;
                 double numRel = 0;
                 for (ResultDoc rdoc : results) {
                     if (relDocs.contains(rdoc.geturl())) {
                         numRel++;
                         avgp = avgp + (numRel / i);
-                        // update user profile of the client side
+                        // update user profile kept in the client side
                         uProfile.updateUserProfileUsingClickedDocument(rdoc.content());
-                        // update user profile of the server side
-                        _searcher.updateUProfileUsingClickedDoc(rdoc.content());
+                        // update user profile kept in the server side
+                        _searcher.updateUProfileUsingClickedDocument(rdoc.content());
                     }
                     ++i;
-//                    System.out.println("Number of Relevant Docs found = " + numRel);
                 }
                 avgp = avgp / relDocs.size();
+                // updating user profile kept in client side using original user query
+                uProfile.updateUserProfile(query);
             }
         }
-        // update user profile of the client side using submitted query
-        uProfile.updateUserProfile(query);
         return avgp;
     }
 
+    /**
+     * Method that re-ranks the result in the client side.
+     *
+     * @param relDocs all the relevant documents returned by the search engine
+     * @return re-ranked resulting documents
+     */
     private ArrayList<ResultDoc> reRankResults(ArrayList<ResultDoc> relDocs) throws IOException {
-        HashMap<String, Float> tempMap = new HashMap<>();
-//        HashSet<String> uniqueDocTerms;
+        HashMap<String, Float> docScoreMap = new HashMap<>();
         HashMap<String, Integer> uniqueDocTerms;
-        HashMap<String, Integer> uProf = uProfile.getUserProfile();
+
         for (int i = 0; i < relDocs.size(); i++) {
             List<String> tokens = StringTokenizer.TokenizeString(relDocs.get(i).content());
             uniqueDocTerms = new HashMap<>();
-//            uniqueDocTerms = new HashSet<>();
+
+            // computing term frequency of all the unique terms found in the document
             for (String tok : tokens) {
-//                uniqueDocTerms.add(tok);
                 if (uniqueDocTerms.containsKey(tok)) {
                     uniqueDocTerms.put(tok, uniqueDocTerms.get(tok) + 1);
                 } else {
                     uniqueDocTerms.put(tok, 1);
                 }
             }
-            float tempVal = 0;
+
+            float docScore = 0;
+            // smoothing parameter for linear interpolation
             float lambda = 0.1f;
-            for (String str : uniqueDocTerms.keySet()) {
-                Integer value = uProf.get(str);
+            for (String term : uniqueDocTerms.keySet()) {
+                // term frequency in the user profile
+                Integer value = uProfile.getUserProfile().get(term);
                 if (value == null) {
                     value = 0;
                 }
-//                Float tokenProb = (value * 1.0f) / uProfile.totalTokens;//smooting
-                Float tokenProb = ((value * 1.0f) / uProfile.totalTokens) * uniqueDocTerms.get(str);//smooting
-                Float refProb = uProfile.referenceModel.get(str);
+
+                // maximum likelihood calculation
+                Float tokenProb = ((value * 1.0f) / uProfile.totalTokens) * uniqueDocTerms.get(term);
+                // probability from reference model for smoothing purpose
+                Float refProb = uProfile.referenceModel.get(term);
                 if (refProb == null) {
                     refProb = 0.0f;
                 }
+
+                // smoothing token probability using linear interpolation
                 Float smoothedTokenProb = (1 - lambda) * tokenProb + lambda * refProb;
-                Float n = smoothedTokenProb;//probality calculation need here
-                //Float n = uProf.get(str);
-                if (n != null) {
-                    tempVal = tempVal + n;
-                }
+                docScore += smoothedTokenProb;
             }
-//            tempVal += 1 / (i + 1); // impact of rank in re-ranking
-            tempMap.put(String.valueOf(i), tempVal);
-//            System.out.println((i + 1) + " - " + tempVal);
+            docScoreMap.put(String.valueOf(i), docScore);
         }
-        Map<String, Float> tempResultedMap = sortByComparator(tempMap, false);
-        tempMap = new HashMap<>();
+
+        /**
+         * Client side re-ranking using true user profile.
+         */
+        Map<String, Float> resultedMap = sortByComparator(docScoreMap, false);
+
+        /**
+         * Re-rank the documents by giving weight to the search engine rank and
+         * the client side rank.
+         */
         int i = 0;
-        for (Map.Entry<String, Float> entry : tempResultedMap.entrySet()) {
-            float tempVal = 0;
-            tempVal = 0.5f * (1.0f / (i + 1)) + 0.5f * (1.0f / (Integer.parseInt(entry.getKey() + 1)));
-            tempMap.put(String.valueOf(Integer.parseInt(entry.getKey())), tempVal);
+        for (Map.Entry<String, Float> entry : resultedMap.entrySet()) {
+            float score = 0;
+            // Giving 50% weight to both search engine and client side rank.
+            score = 0.5f * (1.0f / (i + 1)) + 0.5f * (1.0f / (Integer.parseInt(entry.getKey() + 1)));
+            docScoreMap.put(entry.getKey(), score);
             i++;
         }
-        Map<String, Float> resultedMap = sortByComparator(tempMap, false);
+
+        // sort the documents in descending order according to the new score assigned
+        Map<String, Float> result = sortByComparator(docScoreMap, false);
         ArrayList<ResultDoc> retValue = new ArrayList<>();
-        for (Map.Entry<String, Float> entry : resultedMap.entrySet()) {
+        for (Map.Entry<String, Float> entry : result.entrySet()) {
             retValue.add(relDocs.get(Integer.parseInt(entry.getKey())));
         }
+
+        // return re-ranked documents
         return retValue;
     }
 
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param unsortMap unsorted Map
+     * @param order if true, then sort in ascending order, otherwise in
+     * descending order
+     * @return sorted Map
+     */
     private Map<String, Float> sortByComparator(Map<String, Float> unsortMap, final boolean order) {
         List<Map.Entry<String, Float>> list = new LinkedList<>(unsortMap.entrySet());
         // Sorting the list based on values
@@ -357,7 +450,6 @@ public class Evaluate {
                 return o1.getValue().compareTo(o2.getValue());
             } else {
                 return o2.getValue().compareTo(o1.getValue());
-
             }
         });
         // Maintaining insertion order with the help of LinkedList
@@ -368,7 +460,14 @@ public class Evaluate {
         return sortedMap;
     }
 
-    private ArrayList<String> getAllUserIds(String folder) throws Throwable {
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param folder folder path where all user search log resides
+     * @return list of all user id
+     * @throws java.lang.Throwable
+     */
+    private ArrayList<String> getAllUserId(String folder) throws Throwable {
         ArrayList<String> allUserIds = new ArrayList<>();
         File dir = new File(folder);
         for (File f : dir.listFiles()) {
@@ -380,5 +479,4 @@ public class Evaluate {
         }
         return allUserIds;
     }
-
 }
