@@ -83,20 +83,6 @@ public class Searcher {
     }
 
     /**
-     * Build the user profile maintained by the server side.
-     *
-     * @param userProfilePath
-     * @param userID
-     */
-    public void buildUserProfile(String userProfilePath, String userID) {
-        try {
-            userProfile.createUserProfile(userProfilePath, userID);
-        } catch (IOException ex) {
-            Logger.getLogger(Searcher.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    /**
      * Update user profile based on the clicked document content.
      *
      * @param content
@@ -219,11 +205,11 @@ public class Searcher {
                         if (value == null) {
                             value = 0;
                         }
-                        int tokenCount = userProfile.totalTokens;
+                        int tokenCount = userProfile.getTotalTokenCount();
                         if (tokenCount < 1) {
                             tokenCount = 1;
                         }
-                        Float tokenProb = (value * 1.0f) / userProfile.totalTokens;
+                        Float tokenProb = (value * 1.0f) / userProfile.getTotalTokenCount();
                         Float refProb = userProfile.referenceModel.get(str);
                         if (refProb == null) {
                             refProb = 0.0f;

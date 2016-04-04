@@ -8,12 +8,11 @@ package edu.virginia.cs.user;
 import edu.virginia.cs.index.Searcher;
 import edu.virginia.cs.utility.SpecialAnalyzer;
 import edu.virginia.cs.similarities.OkapiBM25;
+import edu.virginia.cs.utility.StringTokenizer;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,8 +23,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanQuery;
@@ -39,7 +36,7 @@ import org.apache.lucene.util.Version;
 public class ReferenceModel {
 
     private final static String _indexPath = "lucene-AOL-index";
-    private final String _topicTokenFilePath = "dictionaryWithFrequency.txt";
+    private final String _dictionaryFilePath = "dictionaryWithFrequency.txt";
     private final HashMap<String, Float> refModel;
     private final HashMap<String, Integer> queryTokens;
     private final HashMap<String, Integer> IDFRecord;
@@ -56,6 +53,7 @@ public class ReferenceModel {
         IDFRecord = new HashMap<>();
         totalDocument = 0;
         totalTokensCorpus = 0;
+
         parser = new QueryParser(Version.LUCENE_46, "", analyzer);
         BooleanQuery.setMaxClauseCount(2048);
 
@@ -63,58 +61,67 @@ public class ReferenceModel {
         searcher.setSimilarity(new OkapiBM25());
     }
 
-    //create reference model for smoothing and user profile skeleton
-    //consider only query building user profile
+    /**
+     * Method that update reference model based on a user profile. User profile
+     * means a list of user submitted query and corresponding clicked URL.
+     *
+     * @param filePath file path of a user profile
+     * @throws java.io.IOException
+     */
     public void addInitUserProfile(String filePath) throws IOException {
-        if (filePath != null) {
-            String line = null;
-            BufferedReader br = new BufferedReader(new FileReader(filePath));
-            while ((line = br.readLine()) != null) {
-                try {
-                    Query textQuery = parser.parse(parser.escape(line));
-                    String[] qParts = textQuery.toString().split(" ");
-                    for (String qPart : qParts) {
-                        if (qPart.isEmpty()) {
-                            continue;
-                        }
-                        totalTokensCorpus++;//for every token
-                        Integer n = queryTokens.get(qPart);
-                        n = (n == null) ? 1 : ++n;
-                        queryTokens.put(qPart, n);
+        String line;
+        BufferedReader br = new BufferedReader(new FileReader(filePath));
+        while ((line = br.readLine()) != null) {
+            try {
+                Query textQuery = parser.parse(QueryParser.escape(line));
+                String[] qParts = textQuery.toString().split(" ");
+                for (String qPart : qParts) {
+                    if (qPart.isEmpty()) {
+                        continue;
                     }
-                } catch (ParseException exception) {
-                    exception.printStackTrace();
+                    totalTokensCorpus++;
+                    Integer n = queryTokens.get(qPart);
+                    n = (n == null) ? 1 : ++n;
+                    queryTokens.put(qPart, n);
                 }
+            } catch (ParseException exception) {
+                exception.printStackTrace();
+            }
 
-                if ((line = br.readLine()) != null) {
-                    line = searcher.search(line, "clicked_url");
-                    List<String> tokens = tokenizeString(line);
-                    // getting top 10 tokens -1 for all documents summary 
-                    HashMap<String, Integer> retVal = selectTopKtokens(tokens, 10);
-                    for (Map.Entry<String, Integer> entry : retVal.entrySet()) {
-                        totalTokensCorpus += entry.getValue();
-                        try {
-                            Query textQuery = parser.parse(parser.escape(entry.getKey()));
-                            String smoothedKey = textQuery.toString();
-                            Integer n = queryTokens.get(smoothedKey);
-                            n = (n == null) ? entry.getValue() : (n + entry.getValue());
-                            queryTokens.put(smoothedKey, n);
-                        } catch (ParseException ex) {
-                            Logger.getLogger(UserProfile.class.getName()).log(Level.SEVERE, null, ex);
-                        }
+            if ((line = br.readLine()) != null) {
+                line = searcher.search(line, "clicked_url");
+                List<String> tokens = StringTokenizer.TokenizeString(line);
+                HashMap<String, Integer> retVal = selectTopKtokens(tokens, 10);
+                for (Map.Entry<String, Integer> entry : retVal.entrySet()) {
+                    totalTokensCorpus += entry.getValue();
+                    try {
+                        Query textQuery = parser.parse(parser.escape(entry.getKey()));
+                        String smoothedKey = textQuery.toString();
+                        Integer n = queryTokens.get(smoothedKey);
+                        n = (n == null) ? entry.getValue() : (n + entry.getValue());
+                        queryTokens.put(smoothedKey, n);
+                    } catch (ParseException ex) {
+                        Logger.getLogger(UserProfile.class.getName()).log(Level.SEVERE, null, ex);
                     }
                 }
             }
-            br.close();
-        } else {
-            System.out.println("No user found with the file name: " + filePath);
         }
+        br.close();
     }
 
+    /**
+     * Method that returns the top k tokens from a list of tokens. Tokens are
+     * ranked based on their tf-idf value.
+     *
+     * @param tokenList list of tokens
+     * @param k return only the top k elements
+     * @return top k tokens with their term frequency
+     */
     private HashMap<String, Integer> selectTopKtokens(List<String> tokenList, int k) {
-        HashMap<String, Integer> retValue = new HashMap<>(); // for returning top k tokens with term frequency
-        HashMap<String, Integer> tempMap = new HashMap<>(); // stores term frequency of the tokens
-        HashMap<String, Float> unsortedMap = new HashMap<>(); // stores tf-idf weight of the tokens
+        HashMap<String, Integer> retValue = new HashMap<>();
+        HashMap<String, Integer> tempMap = new HashMap<>();
+        /* Stores tf-idf weight of all tokens */
+        HashMap<String, Float> unsortedMap = new HashMap<>();
         for (String token : tokenList) {
             Integer n = tempMap.get(token);
             n = (n == null) ? 1 : ++n;
@@ -138,31 +145,20 @@ public class ReferenceModel {
         return retValue;
     }
 
-    private List<String> tokenizeString(String string) {
-        List<String> result = new ArrayList<>();
-        try {
-            TokenStream stream = analyzer.tokenStream(null, new StringReader(string));
-            stream.reset();
-            while (stream.incrementToken()) {
-                result.add(stream.getAttribute(CharTermAttribute.class).toString());
-            }
-            stream.end();
-            stream.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        return result;
-    }
-
+    /**
+     * Initialize user profile.
+     *
+     * @param userProfilePath
+     * @throws IOException
+     */
     public void initUserProfile(String userProfilePath)
             throws IOException {
-        File folder_test = new File(userProfilePath + "test/");
+        File folder_test = new File(userProfilePath);
         File[] listOfFiles_test = folder_test.listFiles();
         int count = 1;
         for (File file_test : listOfFiles_test) {
             if (file_test.isFile() && file_test.getName().endsWith(".txt")) {
-                addInitUserProfile(userProfilePath + "train/" + file_test.getName());//remove training data
-                addInitUserProfile(userProfilePath + "test/" + file_test.getName());
+                addInitUserProfile(userProfilePath + "/" + file_test.getName());
                 System.out.println(count);
                 count++;
             }
@@ -170,50 +166,37 @@ public class ReferenceModel {
     }
 
     /**
+     * Loads all dictionary words and their term frequency.
      *
      * @param filePath
      * @throws IOException
      */
-    public void addTopicWords(String filePath) throws IOException {
+    public void loadDictionaryWords(String filePath) throws IOException {
         if (filePath != null) {
-            String line = null;
+            String line;
             BufferedReader br = new BufferedReader(new FileReader(filePath));
             while ((line = br.readLine()) != null) {
-                try {
-                    totalTokensCorpus++; //for every token
-                    String[] qParts = line.split(" ");
-                    if (qParts.length == 2) {
-                        Query textQuery = parser.parse(parser.escape(qParts[0]));
-                        qParts[0] = textQuery.toString();
-                        if (qParts[0].isEmpty()) {
-                            continue;
-                        }
-                        Integer n = queryTokens.get(qParts[0]);
-                        if (n == null) {
-                            n = Integer.parseInt(qParts[1]); //frequency
-                        } else {
-                            n = n + Integer.parseInt(qParts[1]);
-                        }
-                        queryTokens.put(qParts[0], n);
-                    } else if (qParts.length == 3) {//bigram
-                        Query textWOrd = parser.parse(parser.escape(qParts[0]));
-                        qParts[0] = textWOrd.toString();
-                        Query textWOrd2 = parser.parse(parser.escape(qParts[1]));
-                        qParts[1] = textWOrd2.toString();
-
-                        String biToken = qParts[0] + " " + qParts[1];
-                        Integer n = queryTokens.get(biToken);
-                        if (n == null) {
-                            n = Integer.parseInt(qParts[2]);//frequency
-                        } else {
-                            n = n + Integer.parseInt(qParts[2]);
-                        }
-                        queryTokens.put(biToken, n);
+                totalTokensCorpus++;
+                String[] qParts = line.split(" ");
+                if (qParts.length == 2) {   // unigrams
+                    Integer n = queryTokens.get(qParts[0]);
+                    if (n == null) {
+                        n = Integer.parseInt(qParts[1]);    // frequency
                     } else {
-                        System.out.println("Dictionary entry is not in right format in: " + line);
+                        n = n + Integer.parseInt(qParts[1]);
                     }
-                } catch (ParseException exception) {
-                    exception.printStackTrace();
+                    queryTokens.put(qParts[0], n);
+                } else if (qParts.length == 3) {    // bigrams
+                    String bigram = qParts[0] + " " + qParts[1];
+                    Integer n = queryTokens.get(bigram);
+                    if (n == null) {
+                        n = Integer.parseInt(qParts[2]);    // frequency
+                    } else {
+                        n = n + Integer.parseInt(qParts[2]);
+                    }
+                    queryTokens.put(bigram, n);
+                } else {
+                    System.out.println("Dictionary entry is not in right format in: " + line);
                 }
             }
             br.close();
@@ -222,13 +205,16 @@ public class ReferenceModel {
         }
     }
 
+    /**
+     * Method that creates the reference model. This model is created over all
+     * user profiles and the topic model dictionary.
+     *
+     * @param userProfilePath directory path where all user profiles
+     * @throws java.io.IOException
+     */
     public void createReferenceModel(String userProfilePath)
             throws IOException {
-        //add topic model data to handle fake queries
-        System.out.println("Adding topic words to reference model");
-        addTopicWords(_topicTokenFilePath);
-        System.out.println(queryTokens.size());
-        System.out.println("Considering user profile");
+        loadDictionaryWords(_dictionaryFilePath);
         initUserProfile(userProfilePath); //setup user profile
         //build reference model
         for (String name : queryTokens.keySet()) {
@@ -254,6 +240,15 @@ public class ReferenceModel {
         return retToken;
     }
 
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param unsortMap unsorted Map
+     * @param order if true, then sort in ascending order, otherwise in
+     * descending order
+     * @param k return only the top k elements
+     * @return sorted Map of k elements
+     */
     private HashMap<String, Float> sortByComparator(Map<String, Float> unsortMap, final boolean order, int k) {
         List<Map.Entry<String, Float>> list = new LinkedList<>(unsortMap.entrySet());
         // Sorting the list based on values

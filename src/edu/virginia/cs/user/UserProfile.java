@@ -13,8 +13,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -23,8 +21,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.apache.lucene.analysis.TokenStream;
-import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanQuery;
@@ -33,28 +29,21 @@ import org.apache.lucene.util.Version;
 
 /**
  *
- * @author Masud
+ * @author wasi
  */
 public class UserProfile {
 
     private final static String _indexPath = "lucene-AOL-index";
-    private HashMap<String, Float> uProfileProb;
-    private HashMap<String, Integer> uProfile;
-    private HashMap<String, Integer> IDFRecord;
-    private SpecialAnalyzer analyzer;
+    private final HashMap<String, Integer> uProfile;
+    private final HashMap<String, Integer> IDFRecord;
+    private final SpecialAnalyzer analyzer;
     private String userID;
-    public int totalTokens;
-    public int initTotalTokensCoount;
-    private int totalQueryCorpus;
-    private int totalTokensCorpus;
-
-    private QueryParser parser;
-    private double avgQueryLength;
+    private int totalTokens;
+    private final QueryParser parser;
     private double totalQueryLength;
     private double totalQuery;
     private int totalDocument;
-    private Searcher searcher;
-
+    private final Searcher searcher;
     public HashMap<String, Float> referenceModel;
 
     public UserProfile() {
@@ -62,21 +51,19 @@ public class UserProfile {
         searcher.setSimilarity(new OkapiBM25());
         analyzer = new SpecialAnalyzer();
         uProfile = new HashMap<>();
-        uProfileProb = new HashMap<>();
         IDFRecord = new HashMap<>();
 
         totalTokens = 0;
-        initTotalTokensCoount = 0;
-
-        avgQueryLength = 0;
         totalQuery = 0;
         totalQueryLength = 0;
         totalDocument = 0;
-        totalQueryCorpus = 0;
-        totalTokensCorpus = 0;
 
         parser = new QueryParser(Version.LUCENE_46, "", analyzer);
         BooleanQuery.setMaxClauseCount(2048);
+    }
+
+    public int getTotalTokenCount() {
+        return totalTokens;
     }
 
     public void setReferenceModel(HashMap<String, Float> rModel) {
@@ -87,6 +74,11 @@ public class UserProfile {
         }
     }
 
+    /**
+     * Return the user profile.
+     *
+     * @return a mapping of words to their term frequency.
+     */
     public HashMap<String, Integer> getUserProfile() {
         HashMap<String, Integer> retVal = new HashMap<>();
         for (String str : uProfile.keySet()) {
@@ -95,82 +87,44 @@ public class UserProfile {
         return retVal;
     }
 
-    public void createUserProfile(String userProfilePath, String param)
-            throws IOException {
-        userID = param;
-        File file = new File(userProfilePath + userID + ".txt");
-        String line;
-        BufferedReader br = new BufferedReader(new FileReader(file));
-        int i = 0;
-        while ((line = br.readLine()) != null) {
-            i++;
-            if (i % 2 == 0) {
-                // for clicked document content
-                line = searcher.search(line, "clicked_url");
-                List<String> tokens = StringTokenizer.TokenizeString(line);
-                // getting top 10 tokens -1 for all documents summary
-                HashMap<String, Integer> retVal = selectTopKtokens(tokens, 10);
-                for (Map.Entry<String, Integer> entry : retVal.entrySet()) {
-                    totalTokens += entry.getValue();
-                    Integer n = uProfile.get(entry.getKey());
-                    n = (n == null) ? entry.getValue() : (n + entry.getValue());
-                    uProfile.put(entry.getKey(), n);
-                    System.out.println("Testing train");
-                }
-                continue;
-            }
-            try {
-                Query textQuery = parser.parse(parser.escape(line));
-                //System.out.println("Text Q: "+textQuery.toString());
-                String[] qParts = textQuery.toString().split(" ");
-                totalQuery++;
-                totalQueryLength = totalQueryLength + qParts.length;
-                for (int ind = 0; ind < qParts.length; ind++) {
-                    if (qParts[ind].isEmpty()) {
-                        continue;
-                    }
-                    totalTokens++;//for every token
-                    Integer n = uProfile.get(qParts[ind]);
-                    n = (n == null || n == 0) ? 1 : ++n;
-
-                    uProfile.put(qParts[ind], n);
-                    System.out.println(" Try Testing train");
-                }
-            } catch (ParseException exception) {
-                exception.printStackTrace();
-            }
-        }
-        br.close();
-        initTotalTokensCoount = totalTokens;
-    }
-
-    public void updateUserProfile(String newQuery)
+    /**
+     * Update user profile by the user submitted query.
+     *
+     * @param queryText
+     * @throws java.io.IOException
+     */
+    public void updateUserProfile(String queryText)
             throws IOException {
         try {
-            Query textQuery = parser.parse(parser.escape(newQuery));
+            Query textQuery = parser.parse(QueryParser.escape(queryText));
             String[] qParts = textQuery.toString().split(" ");
             totalQuery++;
             totalQueryLength = totalQueryLength + qParts.length;
-            for (int ind = 0; ind < qParts.length; ind++) {
-                if (qParts[ind].isEmpty()) {
+            for (String qPart : qParts) {
+                if (qPart.isEmpty()) {
                     continue;
                 }
                 totalTokens++;//for every token
-                Integer n = uProfile.get(qParts[ind]);
+                Integer n = uProfile.get(qPart);
                 n = (n == null) ? 1 : ++n;
-                uProfile.put(qParts[ind], n);
+                uProfile.put(qPart, n);
             }
         } catch (ParseException exception) {
             exception.printStackTrace();
         }
     }
 
+    /**
+     * Update user profile by the content of the user clicked document.
+     *
+     * @param content
+     * @throws java.io.IOException
+     */
     public void updateUserProfileUsingClickedDocument(String content)
             throws IOException {
-        // updating user profile with the clicked document content
-        //updating with document only linear interpolation with lamda =0.1
         List<String> tokens = StringTokenizer.TokenizeString(content);
-        HashMap<String, Integer> retVal = selectTopKtokens(tokens, 10); // getting top 10 tokens
+        /* To update user profile, select the top 10 tokens using tf-idf weight */
+        HashMap<String, Integer> retVal = selectTopKtokens(tokens, 10);
         for (Map.Entry<String, Integer> entry : retVal.entrySet()) {
             totalTokens += entry.getValue();
             Integer n = uProfile.get(entry.getKey());
@@ -179,29 +133,35 @@ public class UserProfile {
         }
     }
 
+    /**
+     * Returns average length of all queries submitted by the user. Default
+     * value is 3.
+     *
+     * @return average query length
+     */
     public double getAvgQueryLength() {
         if (totalQuery < 1) {
-            //return 0;//zero create problem
             return 3;
         }
         return totalQueryLength / totalQuery;
     }
 
-    /*
-     @return Returns the KL divergence, K(old || newProfile)
+    /**
+     * Computes KL-Divergence between two different user profiles.
+     *
+     * @param otherProfile
+     * @param otherProfileTokenCount
+     * @return KL-Divergence value
      */
-    public float calculateKLDivergence(HashMap<String, Integer> old_uProfile, int oldProfileTokenCount) {
-
+    public float calculateKLDivergence(HashMap<String, Integer> otherProfile, int otherProfileTokenCount) {
         float klDiv = 0;
         float lambda = 0.1f;
-        for (String name : old_uProfile.keySet()) {
-
-            Integer value = old_uProfile.get(name);
+        for (String name : otherProfile.keySet()) {
+            Integer value = otherProfile.get(name);
             if (value == null) {
                 value = 0;
             }
-            //Float tokenProb = (value * 1.0f) / oldProfileTokenCount;//smooting//use old profile token count
-            Float tokenProb = (value * 1.0f) / oldProfileTokenCount;
+            Float tokenProb = (value * 1.0f) / otherProfileTokenCount;
             Float refProb = referenceModel.get(name);
             if (refProb == null) {
                 refProb = 0.0f;
@@ -213,16 +173,11 @@ public class UserProfile {
             if (value2 == null) {
                 value2 = 0;
             }
-            Float tokenProb2 = (value2 * 1.0f) / totalTokens;//smooting
-            Float refProb2 = refProb;//remain same for a single key name
-            if (refProb2 == null) {
-                refProb2 = 0.0f;
-            }
+            Float tokenProb2 = (value2 * 1.0f) / totalTokens;
+            Float refProb2 = refProb;
+
             Float smoothedTokenProb2 = (1 - lambda) * tokenProb2 + lambda * refProb2;
-            Float p2 = smoothedTokenProb2; //updated user profile
-            if (p1 == null || p2 == null) {
-                break;
-            }
+            Float p2 = smoothedTokenProb2;
             if (p1 == 0) {
                 continue;
             }
@@ -234,10 +189,19 @@ public class UserProfile {
         return klDiv;
     }
 
+    /**
+     * Method that returns the top k tokens from a list of tokens. Tokens are
+     * ranked based on their tf-idf value.
+     *
+     * @param tokenList list of tokens
+     * @param k return only the top k elements
+     * @return top k tokens with their term frequency
+     */
     private HashMap<String, Integer> selectTopKtokens(List<String> tokenList, int k) {
-        HashMap<String, Integer> retValue = new HashMap<>(); // for returning top k tokens with term frequency
-        HashMap<String, Integer> tempMap = new HashMap<>(); // stores term frequency of the tokens
-        HashMap<String, Float> unsortedMap = new HashMap<>(); // stores tf-idf weight of the tokens
+        HashMap<String, Integer> retValue = new HashMap<>();
+        HashMap<String, Integer> tempMap = new HashMap<>();
+        /* Stores tf-idf weight of all tokens */
+        HashMap<String, Float> unsortedMap = new HashMap<>();
         for (String token : tokenList) {
             Integer n = tempMap.get(token);
             n = (n == null) ? 1 : ++n;
@@ -254,13 +218,22 @@ public class UserProfile {
             double tfIdfWeight = entry.getValue() * Math.log((totalDocument / IDFRecord.get(entry.getKey())));
             unsortedMap.put(entry.getKey(), (float) tfIdfWeight);
         }
-        HashMap<String, Float> temp = sortByComparator(unsortedMap, false, 10);
+        HashMap<String, Float> temp = sortByComparator(unsortedMap, false, k);
         for (Map.Entry<String, Float> entry : temp.entrySet()) {
             retValue.put(entry.getKey(), tempMap.get(entry.getKey()));
         }
         return retValue;
     }
 
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param unsortMap unsorted Map
+     * @param order if true, then sort in ascending order, otherwise in
+     * descending order
+     * @param k return only the top k elements
+     * @return sorted Map of k elements
+     */
     private HashMap<String, Float> sortByComparator(Map<String, Float> unsortMap, final boolean order, int k) {
         List<Map.Entry<String, Float>> list = new LinkedList<>(unsortMap.entrySet());
         // Sorting the list based on values

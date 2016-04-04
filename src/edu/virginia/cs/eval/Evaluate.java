@@ -260,7 +260,7 @@ public class Evaluate {
             // totalQueries = total number of queries for 'n' users
             totalQueries += numQueries;
             // give the number of tokens to calcualte token probability on the fly
-            double klDivergence = (double) _searcher.getUserProfile().calculateKLDivergence(uProfile.getUserProfile(), uProfile.totalTokens);
+            double klDivergence = (double) _searcher.getUserProfile().calculateKLDivergence(uProfile.getUserProfile(), uProfile.getTotalTokenCount());
             totalKL += klDivergence;
             // compute MAP for the current user
             double MAP = meanAvgPrec / numQueries;
@@ -393,7 +393,7 @@ public class Evaluate {
                 }
 
                 // maximum likelihood calculation
-                Float tokenProb = ((value * 1.0f) / uProfile.totalTokens) * uniqueDocTerms.get(term);
+                Float tokenProb = ((value * 1.0f) / uProfile.getTotalTokenCount()) * uniqueDocTerms.get(term);
                 // probability from reference model for smoothing purpose
                 Float refProb = uProfile.referenceModel.get(term);
                 if (refProb == null) {
