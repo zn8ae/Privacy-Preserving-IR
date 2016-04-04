@@ -68,5 +68,5 @@ The entire evaluation procedure on a single user works as follows.
 ##### Additional Information
 
 * The model is tested for both personalization and non-personalization settings.
-* Privacy preservation is evaluated through KL-Divergence
+* Privacy preservation is evaluated through KL-Divergence.
 
