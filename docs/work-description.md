@@ -1,7 +1,7 @@
 
 ## Crawling and Generating Lucene Index
 
-### Step. 1 - Crawl all URLs from AOL dataset
+### Step. 1 - Crawl all web Urls from AOL dataset
   * List of all URLs can be found [here](https://drive.google.com/a/virginia.edu/file/d/0B8ZGlkqDw7hFNkc0c0p1OVF2YTA/view)
 
 ### Step. 2 - Creating Lucene Index
