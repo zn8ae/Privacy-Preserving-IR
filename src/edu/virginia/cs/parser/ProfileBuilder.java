@@ -148,10 +148,6 @@ public class ProfileBuilder {
         }
     }
 
-    private void crawledData() throws Throwable {
-        LoadDirectory("./data/crawled_data", 2);
-    }
-
     public static void main(String[] args) throws Throwable {
         ProfileBuilder pBuilder = new ProfileBuilder();
         pBuilder.LoadDirectory("./data/all AOL query log", 1);
