@@ -26,6 +26,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.util.Version;
 import edu.virginia.cs.model.GenerateCoverQuery;
 import edu.virginia.cs.model.QueryTopicInference;
+import edu.virginia.cs.similarities.OkapiBM25;
 import edu.virginia.cs.utility.FileOperations;
 import edu.virginia.cs.utility.StringTokenizer;
 
@@ -78,6 +79,7 @@ public class Evaluate {
 
         parser = new QueryParser(Version.LUCENE_46, "", new SpecialAnalyzer());
         _searcher = new Searcher(_indexPath);
+        _searcher.setSimilarity(new OkapiBM25());
         // setting the flag to enable personalization
         _searcher.activatePersonalization(true);
 
@@ -308,7 +310,7 @@ public class Evaluate {
      */
     private double AvgPrec(String query, String clickedDocs, int index) throws Throwable {
         // generating the cover queries
-        ArrayList<String> coverQueries = gCoverQuery.generateNQueries(allQueryTopocProb.get(index), numOfCoverQ, uProfile.getAvgQueryLength());
+        ArrayList<String> coverQueries = gCoverQuery.generateCoverQueries(allQueryTopocProb.get(index), numOfCoverQ, uProfile.getAvgQueryLength());
         double avgp = 0.0;
         int randNum = (int) (Math.random() * coverQueries.size());
 

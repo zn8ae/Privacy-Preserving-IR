@@ -2,7 +2,7 @@ package edu.virginia.cs.index;
 
 public class ResultDoc {
 
-    private int _id;
+    private final int _id;
     private String _title = "[no title]";
     private String _content = "[no content]";
     private String _docUrl = "[no url]";

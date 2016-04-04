@@ -21,11 +21,11 @@ import edu.virginia.cs.utility.FileOperations;
  */
 public class ProfileBuilder {
 
-    private FileOperations fiop;
-    private HashMap<String, ArrayList<String>> userProfile;
-    private HashMap<String, Integer> countRecord;
-    private HashMap<String, String> crawledData;
-    private HashSet<String> aliveURLs;
+    private final FileOperations fiop;
+    private final HashMap<String, ArrayList<String>> userProfile;
+    private final HashMap<String, Integer> countRecord;
+    private final HashMap<String, String> crawledData;
+    private final HashSet<String> aliveURLs;
 
     public ProfileBuilder() {
         fiop = new FileOperations();
@@ -63,11 +63,6 @@ public class ProfileBuilder {
                     time = time[0].split("-");
                     String s = words[0] + "\n" + words[1];
                     fiop.appnedToFile(fileName, s);
-//                    if (Integer.parseInt(time[1]) == 5) { // data from month = May
-//                        fiop.appnedToFile(testFilename, s);
-//                    } else { // data from month = March and April
-//                        fiop.appnedToFile(trainFilename, s);
-//                    }
                 }
             }
         }
@@ -116,7 +111,7 @@ public class ProfileBuilder {
             aliveURLs.add(lines[i]);
             i++;
         }
-//        System.out.println("Number of live urls - " + aliveURLs.size());
+
         int numberOfDocumentsLoaded = 0;
         File dir = new File(folder);
         for (File f : dir.listFiles()) {
@@ -131,7 +126,7 @@ public class ProfileBuilder {
                 LoadDirectory(f.getAbsolutePath(), choice);
             }
         }
-//      fiop.storeInFile("data/user_profiles_with_timestamp.txt", userProfile);
+
         System.out.println("Loading " + numberOfDocumentsLoaded + " documents from " + folder);
         if (choice == 1) {
             System.out.println("Total Number of Unique Profiles - " + userProfile.size());
@@ -148,7 +143,6 @@ public class ProfileBuilder {
 
     private void loadFile(String param) {
         System.out.println("Loading file...");
-//      System.out.println(param);
         String lines[] = param.split("[\\r\\n]+");
         int i = 0;
         while (i < lines.length) {
@@ -164,7 +158,6 @@ public class ProfileBuilder {
     public static void main(String[] args) throws Throwable {
         ProfileBuilder pBuilder = new ProfileBuilder();
         pBuilder.LoadDirectory("./data/all AOL query log", 1);
-//        pBuilder.crawledData();
         pBuilder.generateTopUserProfile(100, 150);
     }
 

@@ -80,23 +80,15 @@ public class UserProfile {
     }
 
     public void setReferenceModel(HashMap<String, Float> rModel) {
-        referenceModel = new HashMap<>();//copy otherwise create problem
+        referenceModel = new HashMap<>();
         for (String str : rModel.keySet()) {
             referenceModel.put(str, rModel.get(str));
-        }
-    }
-
-    public void setReferenceToken(HashMap<String, Integer> tokenModel) {
-        uProfile = new HashMap<>();
-        for (String str : tokenModel.keySet()) {
-            uProfile.put(str, tokenModel.get(str));
+            uProfile.put(str, 0);
         }
     }
 
     public HashMap<String, Integer> getUserProfile() {
-
         HashMap<String, Integer> retVal = new HashMap<>();
-        //retVal= uProfile.
         for (String str : uProfile.keySet()) {
             retVal.put(str, uProfile.get(str));
         }
@@ -122,7 +114,7 @@ public class UserProfile {
                     totalTokens += entry.getValue();
                     Integer n = uProfile.get(entry.getKey());
                     n = (n == null) ? entry.getValue() : (n + entry.getValue());
-                    uProfile.put(entry.getKey(), n);////problem???
+                    uProfile.put(entry.getKey(), n);
                     System.out.println("Testing train");
                 }
                 continue;
@@ -149,20 +141,6 @@ public class UserProfile {
             }
         }
         br.close();
-        //skip loop cz we will just store token and freq not prob directly
-        //create user profile
-        //can you reduce this loop?
-        /*float lambda = 0.1f;
-         for (String name : queryTokens.keySet()) {
-         Integer value = queryTokens.get(name);
-         Float tokenProb = (value * 1.0f) / totalTokens;//smooting
-         Float refProb = referenceModel.get(name);
-         if (refProb == null) {
-         refProb = 0.0f;
-         }
-         Float smoothedTokenProb = (1 - lambda) * tokenProb + lambda * refProb;
-         uProfile.put(name, smoothedTokenProb);
-         }*/
         initTotalTokensCoount = totalTokens;
     }
 
@@ -185,18 +163,6 @@ public class UserProfile {
         } catch (ParseException exception) {
             exception.printStackTrace();
         }
-        //create user profile
-       /* float lambda = 0.1f;
-         for (String name : queryTokens.keySet()) {
-         Integer value = queryTokens.get(name);
-         Float tokenProb = (value * 1.0f) / totalTokens; //smoothing
-         Float refProb = referenceModel.get(name);
-         if (refProb == null) {
-         refProb = 0.0f;
-         }
-         Float smoothedTokenProb = (1 - lambda) * tokenProb + lambda * refProb;
-         uProfile.put(name, smoothedTokenProb);
-         }*/
     }
 
     public void updateUserProfileUsingClickedDocument(String content)

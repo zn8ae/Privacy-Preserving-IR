@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import java.util.regex.Pattern;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.apache.lucene.queryparser.classic.ParseException;
@@ -35,16 +34,16 @@ import org.apache.lucene.util.Version;
 
 /**
  *
- * @author mr5ba
+ * @author wasi
  */
 public class ReferenceModel {
 
     private final static String _indexPath = "lucene-AOL-index";
     private final String _topicTokenFilePath = "dictionaryWithFrequency.txt";
-    private HashMap<String, Float> refModel;
-    private HashMap<String, Integer> queryTokens;
-    private HashMap<String, Integer> IDFRecord;
-    private SpecialAnalyzer analyzer;
+    private final HashMap<String, Float> refModel;
+    private final HashMap<String, Integer> queryTokens;
+    private final HashMap<String, Integer> IDFRecord;
+    private final SpecialAnalyzer analyzer;
     private int totalTokensCorpus;
     private final QueryParser parser;
     private int totalDocument;

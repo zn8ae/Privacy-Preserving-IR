@@ -20,6 +20,12 @@ public class StringTokenizer {
 
     public static final SpecialAnalyzer analyzer = new SpecialAnalyzer();
 
+    /**
+     * Method that generates list of tokens from the parameter string.
+     *
+     * @param string
+     * @return list of tokens generated
+     */
     public static List<String> TokenizeString(String string) {
         List<String> result = new ArrayList<>();
         try {

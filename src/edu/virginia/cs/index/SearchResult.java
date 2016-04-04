@@ -3,43 +3,47 @@ package edu.virginia.cs.index;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Represents results returned by Lucene. Includes the list of search result
  * objects, the original query, and the highlighted snippets.
  */
 public class SearchResult {
+
     private ArrayList<ResultDoc> results;
-    private int totalHits;
-    private SearchQuery searchQuery;
-    private HashMap<Integer, String> htmlSnippets; // map id to highlighted
-                                                    // string
+    private final int totalHits;
+    private final SearchQuery searchQuery;
+    private final HashMap<Integer, String> htmlSnippets; // map id to highlighted
 
     /**
      * Default constructor to represent an empty search result.
+     *
      * @param searchQuery
      */
     public SearchResult(SearchQuery searchQuery) {
         totalHits = 0;
-        results = new ArrayList<ResultDoc>();
+        results = new ArrayList<>();
         this.searchQuery = searchQuery;
-        htmlSnippets = new HashMap<Integer, String>();
+        htmlSnippets = new HashMap<>();
     }
 
     /**
      * Constructor.
+     *
      * @param searchQuery
      * @param totalHits
      */
     public SearchResult(SearchQuery searchQuery, int totalHits) {
-        this.results = new ArrayList<ResultDoc>();
+        this.results = new ArrayList<>();
         this.totalHits = totalHits;
         this.searchQuery = searchQuery;
-        htmlSnippets = new HashMap<Integer, String>();
+        htmlSnippets = new HashMap<>();
     }
 
     /**
      * Adds a search result to this object.
+     *
      * @param rdoc
      */
     public void addResult(ResultDoc rdoc) {
@@ -48,6 +52,7 @@ public class SearchResult {
 
     /**
      * Set the highlighted text for this document.
+     *
      * @param rdoc
      * @param snippet
      */
@@ -86,13 +91,13 @@ public class SearchResult {
 
     /**
      * Temporarily used to create paginated results.
+     *
      * @param from
-     * @param to
      */
     public void trimResults(int from) {
         // bounds checking
         if (from >= results.size()) {
-            results = new ArrayList<ResultDoc>();
+            results = new ArrayList<>();
             return;
         }
 
@@ -100,22 +105,34 @@ public class SearchResult {
 
         // trimming
         List<ResultDoc> newResults = results.subList(from, to);
-        results = new ArrayList<ResultDoc>(newResults);
+        results = new ArrayList<>(newResults);
     }
 
     /**
      * Tells whether two objects are both SearchQueries with equal contents.
+     *
      * @param other
      * @return true if the objects are equal
      */
+    @Override
     public boolean equals(Object other) {
-        if (!(other instanceof SearchResult))
+        if (!(other instanceof SearchResult)) {
             return false;
+        }
 
         SearchResult otherResult = (SearchResult) other;
         return otherResult.searchQuery.equals(searchQuery)
                 && otherResult.results == results
                 && otherResult.totalHits == totalHits;
 
+    }
+
+    @Override
+    public int hashCode() {
+        int hash = 5;
+        hash = 97 * hash + Objects.hashCode(this.results);
+        hash = 97 * hash + this.totalHits;
+        hash = 97 * hash + Objects.hashCode(this.searchQuery);
+        return hash;
     }
 }

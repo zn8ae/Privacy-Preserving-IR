@@ -41,11 +41,12 @@ public class Searcher {
 
     private IndexSearcher indexSearcher;
     private SpecialAnalyzer analyzer;
-    private UserProfile userProfile;
     private static SimpleHTMLFormatter formatter;
-
     private static final int numFragments = 4;
     private static final String defaultField = "content";
+    /* User profile which is constructed and maintained in the server side */
+    private UserProfile userProfile;
+    /* Flag to turn on or off personalization */
     private boolean activatePersonalization = false;
 
     /**
@@ -64,14 +65,29 @@ public class Searcher {
         }
     }
 
+    /**
+     * Activate or deactivate personalization.
+     *
+     * @param flag
+     */
     public void activatePersonalization(boolean flag) {
         activatePersonalization = flag;
     }
 
+    /**
+     * Initialize the user profile maintained by the server side.
+     *
+     */
     public void initializeUserProfile() {
         userProfile = new UserProfile();
     }
 
+    /**
+     * Build the user profile maintained by the server side.
+     *
+     * @param userProfilePath
+     * @param userID
+     */
     public void buildUserProfile(String userProfilePath, String userID) {
         try {
             userProfile.createUserProfile(userProfilePath, userID);
@@ -80,18 +96,30 @@ public class Searcher {
         }
     }
 
-    public void updateUProfileUsingClickedDoc(String content) throws IOException {
+    /**
+     * Update user profile based on the clicked document content.
+     *
+     * @param content
+     * @throws java.io.IOException
+     */
+    public void updateUProfileUsingClickedDocument(String content) throws IOException {
         userProfile.updateUserProfileUsingClickedDocument(content);
     }
 
+    /**
+     * Return user profile maintained by the server side.
+     *
+     * @return user profile
+     */
     public UserProfile getUserProfile() {
         return userProfile;
     }
 
-    public double getAvgQueryLength() {
-        return userProfile.getAvgQueryLength();
-    }
-
+    /**
+     * Sets ranking function for index searching.
+     *
+     * @param sim
+     */
     public void setSimilarity(Similarity sim) {
         indexSearcher.setSimilarity(sim);
     }
@@ -122,39 +150,20 @@ public class Searcher {
      *
      * @param queryText The text to search
      * @return the SearchResult
-     *
      */
     public SearchResult search(String queryText) {
         return search(new SearchQuery(queryText, defaultField));
     }
 
+    /**
+     * Searches for a document content in the index.
+     *
+     * @param queryText the document title, a URL
+     * @param field
+     * @return clicked document content
+     */
     public String search(String queryText, String field) {
         return runSearch(new SearchQuery(queryText, field), "content");
-    }
-
-    private static Map<String, Float> sortByComparator(Map<String, Float> unsortMap, final boolean order) {
-        List<Entry<String, Float>> list = new LinkedList<>(unsortMap.entrySet());
-        // Sorting the list based on values
-        Collections.sort(list, (Entry<String, Float> o1, Entry<String, Float> o2) -> {
-            if (order) {
-                return o1.getValue().compareTo(o2.getValue());
-            } else {
-                return o2.getValue().compareTo(o1.getValue());
-
-            }
-        });
-        // Maintaining insertion order with the help of LinkedList
-        Map<String, Float> sortedMap = new LinkedHashMap<>();
-        list.stream().forEach((entry) -> {
-            sortedMap.put(entry.getKey(), entry.getValue());
-        });
-        return sortedMap;
-    }
-
-    private void printMap(Map<String, Float> map) {
-        map.entrySet().stream().forEach((entry) -> {
-            System.out.println("Key : " + entry.getKey() + " Value : " + entry.getValue());
-        });
     }
 
     /**
@@ -170,73 +179,79 @@ public class Searcher {
             ScoreDoc[] hits;
             String field = searchQuery.fields().get(0);
             if (activatePersonalization) {
-                ScoreDoc[] tempHits = docs.scoreDocs;
-                HashMap<String, Float> tempMap = new HashMap<String, Float>();
-                HashSet<String> uniqueDocTerms = new HashSet<>();
-//                    HashMap<String, Integer> uTerms = new HashMap<>();
+                ScoreDoc[] relDocs = docs.scoreDocs;
+
+                /* Store return document with their personalized score */
+                HashMap<String, Float> mapDocToScore = new HashMap<>();
+                /* Unique terms found in the returned document */
+                HashSet<String> uniqueDocTerms;
+                /* Fetching server side user profile for personalization */
                 HashMap<String, Integer> uProf = userProfile.getUserProfile();
-                //System.out.println("user profile token number: "+userProfile.totalTokens);
-                //use prob from token
-                for (int i = 0; i < tempHits.length; i++) {
+
+                for (int i = 0; i < relDocs.length; i++) {
                     uniqueDocTerms = new HashSet<>();
-//                        uTerms = new HashMap<>();
-                    ScoreDoc hit = tempHits[i];
-                    Document doc = indexSearcher.doc(hit.doc);
+                    Document doc = indexSearcher.doc(relDocs[i].doc);
+
+                    /**
+                     * Extract the unique tokens from a relevant document
+                     * returned by the lucene index searcher.
+                     */
                     TokenStream ts = doc.getField(field).tokenStream(analyzer);
                     CharTermAttribute terms = ts.addAttribute(CharTermAttribute.class);
                     ts.reset();
                     while (ts.incrementToken()) {
-//                            String str = terms.toString();
-//                            if (uTerms.containsKey(str)) {
-//                                uTerms.put(str, uTerms.get(str) + 1);
-//                            } else {
-//                                uTerms.put(str, 1);
-//                            }
                         uniqueDocTerms.add(terms.toString());
                     }
                     ts.end();
                     ts.close();
 
-                    float tempVal = 0;
+                    /* Score after personalizing result */
+                    float score = 0;
+                    /* Smoothing paramter for linear interpolation */
                     float lambda = 0.1f;
+
+                    /**
+                     * Computing score for a returned document based on user
+                     * profile maintained by the server side.
+                     */
                     for (String str : uniqueDocTerms) {
-//                        for (Entry<String, Integer> entry : uTerms.entrySet()) {
-                        //calcualte prob on the fly
-                        //user profile used only here for personalized search
-//                            String str = entry.getKey();
                         Integer value = uProf.get(str);
                         if (value == null) {
                             value = 0;
                         }
-                        //System.out.println("user token number: "+userProfile.totalTokens);
                         int tokenCount = userProfile.totalTokens;
                         if (tokenCount < 1) {
                             tokenCount = 1;
                         }
-                        Float tokenProb = (value * 1.0f) / userProfile.totalTokens;//smooting
-//                            tokenProb = tokenProb * entry.getValue();
+                        Float tokenProb = (value * 1.0f) / userProfile.totalTokens;
                         Float refProb = userProfile.referenceModel.get(str);
                         if (refProb == null) {
                             refProb = 0.0f;
                         }
+                        /* Smoothing using linear interpolation */
                         Float smoothedTokenProb = (1 - lambda) * tokenProb + lambda * refProb;
-                        Float n = smoothedTokenProb;//probality calculation need here
-                        if (n != null) {
-                            tempVal = tempVal + n;
-                        }
+                        score = score + smoothedTokenProb;
                     }
-                    tempMap.put(String.valueOf(i), hit.score + tempVal);
-                    tempHits[i].score = hit.score + tempVal;
+
+                    /**
+                     * New score is the sum of the score returned by the lucene
+                     * index and the personalized score generated.
+                     */
+                    relDocs[i].score = relDocs[i].score + score;
+                    mapDocToScore.put(String.valueOf(i), relDocs[i].score + score);
                 }
-                Map<String, Float> resultedMap = sortByComparator(tempMap, false);
-                //printMap(tempMap);
+
+                /**
+                 * Re-rank the document after doing personalization.
+                 */
+                Map<String, Float> resultedMap = sortByComparator(mapDocToScore, false);
                 int i = 0;
-                hits = new ScoreDoc[tempHits.length];
+                hits = new ScoreDoc[relDocs.length];
                 for (Map.Entry<String, Float> entry : resultedMap.entrySet()) {
-                    hits[i] = tempHits[Integer.parseInt(entry.getKey())];
+                    hits[i] = relDocs[Integer.parseInt(entry.getKey())];
                     i++;
                 }
-                //Update user profile
+                /* Updating the server side user profile with the query text */
                 userProfile.updateUserProfile(searchQuery.queryText());
             } else {
                 hits = docs.scoreDocs;
@@ -271,6 +286,13 @@ public class Searcher {
         return new SearchResult(searchQuery);
     }
 
+    /**
+     * Searches for document content in the lucene index.
+     *
+     * @param searchQuery a clicked URL
+     * @param indexableField
+     * @return clicked document content
+     */
     private String runSearch(SearchQuery searchQuery, String indexableField) {
         BooleanQuery combinedQuery = new BooleanQuery();
         for (String field : searchQuery.fields()) {
@@ -291,7 +313,7 @@ public class Searcher {
             Document doc = indexSearcher.doc(hits[0].doc);
             returnedResult = doc.getField(indexableField).stringValue();
         } catch (IOException exception) {
-            System.out.println("Error in getting clicked URL");
+            exception.printStackTrace();
         }
         return returnedResult;
     }
@@ -308,5 +330,32 @@ public class Searcher {
             result += s + " ... ";
         }
         return result;
+    }
+
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param unsortMap unsorted Map
+     * @param order if true, then sort in ascending order, otherwise in
+     * descending order
+     * @return sorted Map
+     */
+    private Map<String, Float> sortByComparator(Map<String, Float> unsortMap, final boolean order) {
+        List<Entry<String, Float>> list = new LinkedList<>(unsortMap.entrySet());
+        // Sorting the list based on values
+        Collections.sort(list, (Entry<String, Float> o1, Entry<String, Float> o2) -> {
+            if (order) {
+                return o1.getValue().compareTo(o2.getValue());
+            } else {
+                return o2.getValue().compareTo(o1.getValue());
+
+            }
+        });
+        // Maintaining insertion order with the help of LinkedList
+        Map<String, Float> sortedMap = new LinkedHashMap<>();
+        list.stream().forEach((entry) -> {
+            sortedMap.put(entry.getKey(), entry.getValue());
+        });
+        return sortedMap;
     }
 }

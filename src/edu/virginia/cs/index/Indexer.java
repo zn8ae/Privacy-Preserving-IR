@@ -32,10 +32,8 @@ public class Indexer {
         config.setOpenMode(OpenMode.CREATE);
         config.setRAMBufferSizeMB(2048.0);
 
-        FSDirectory dir;
-        IndexWriter writer = null;
-        dir = FSDirectory.open(new File(indexPath));
-        writer = new IndexWriter(dir, config);
+        FSDirectory dir = FSDirectory.open(new File(indexPath));
+        IndexWriter writer = new IndexWriter(dir, config);
 
         return writer;
     }
@@ -56,22 +54,18 @@ public class Indexer {
         _contentFieldType.setStored(true);
 
         IndexWriter writer = setupIndex(indexPath);
-        //indesed whole folder
         File folder = new File(prefix);
         File[] listOfFiles = folder.listFiles();
-        System.out.println("File name: " + prefix);
-        String line = null;
-        String lineUrl = null;
+
+        String line;
+        String lineUrl;
         int indexed = 0;
-        for (int i = 0; i < listOfFiles.length; i++) {
-            File file = listOfFiles[i];
+        for (File file : listOfFiles) {
             if (file.isFile() && file.getName().endsWith(".txt")) {
                 System.out.println("File name: " + file.getName());
-                /* do somthing with content */
                 BufferedReader br = new BufferedReader(new FileReader(prefix + file.getName()));
                 while ((lineUrl = br.readLine()) != null) {
-                    if ((line = br.readLine()) == null) //skiping url line
-                    {
+                    if ((line = br.readLine()) == null) {
                         break;
                     }
                     Document doc = new Document();

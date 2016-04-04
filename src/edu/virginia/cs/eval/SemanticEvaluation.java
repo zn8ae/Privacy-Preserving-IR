@@ -1,11 +1,8 @@
 package edu.virginia.cs.eval;
 
-import edu.virginia.cs.user.ReferenceModel;
 import java.io.IOException;
 import java.util.ArrayList;
-import edu.virginia.cs.index.Searcher;
 import edu.virginia.cs.utility.SpecialAnalyzer;
-import edu.virginia.cs.user.UserProfile;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.util.HashMap;
@@ -15,51 +12,13 @@ import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.Version;
-import edu.virginia.cs.model.GenerateQuery;
 
 public class SemanticEvaluation {
 
-    private String _judgeFile = "./data/user_profiles/test/";
-    private final String _userProfileDirTrain = "./data/user_profiles/train/";
-    private final String _indexPath = "lucene-AOL-index";
-    final static String _userProfileDir = "./data/user_profiles/";
-    private Searcher _searcher = null;
-    private HashMap<String, ArrayList<String>> mappingQueryToURL;
-    private ArrayList<String> allQueries;
-    private ArrayList<String> allQueryProbab;
-    private GenerateQuery gQuery;
-    private UserProfile uProfile; // client side user profile
-    private ReferenceModel refUserModel;
-    private HashMap<String, Float> intialUserProfile;
     private SpecialAnalyzer analyzer;
-
-//    private SemanticCoverQuery semanticQuery;
-    //private double totalMAP = 0.0;
-    private double totalQueries = 0.0;
-    private double allNumQueries = 0.0;
-    private double allMeanAvgPrec = 0.0;
-
-    private double alldivergence1 = 0.0;
-    private double alldivergence2 = 0.0;
-    private double alldivergence3 = 0.0;
-
-    HashMap<String, Float> tempRefModel;
-    HashMap<String, Integer> tempRefToken;
-
-    //knowledge
-    HashMap<String, Integer> originalQueryList;
-    HashMap<String, Integer> coverQueryList;
-    HashMap<String, Integer> originalQueryMap;
-
-    HashMap<String, Double> originalQueryProb;
-    HashMap<String, Double> coverQueryProb;
-    HashMap<String, Double> probOfXGivenY;
-
     //data structure for mutual information measurement
-    public HashMap<String, Integer> dictionaryWords = new HashMap<>();
-    int totalDoc = 2225;
-    int totalTerm = 23225;
-    int[][] termDocMatrix = new int[totalTerm][totalDoc];
+    private HashMap<String, Integer> dictionaryWords;
+    int[][] termDocMatrix = new int[2225][23225];
     QueryParser parser;
 
     int totalNotinDic = 0;
@@ -67,88 +26,55 @@ public class SemanticEvaluation {
     public void initDSMinfo() {
         analyzer = new SpecialAnalyzer();
         parser = new QueryParser(Version.LUCENE_46, "", analyzer);
-        BufferedReader br = null;
+        BufferedReader br;
         try {
             dictionaryWords = new HashMap<>();
-            String line = null;
+            String line;
             br = new BufferedReader(new FileReader("data/mutual_info_data/bbcDictionary.txt"));
             while ((line = br.readLine()) != null) {
                 String[] tokens = line.split("\t");
-                //System.out.println("token length: "+tokens.length);
-                if (tokens.length == 2)//valid line 
-                {
+                if (tokens.length == 2) {
                     Integer serial = Integer.parseInt(tokens[0]);
                     String key = tokens[1];
                     dictionaryWords.put(key, serial);
                 }
             }
-        } catch (Exception ex) {
+            br.close();
+        } catch (IOException | NumberFormatException ex) {
             Logger.getLogger(SemanticEvaluation.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            try {
-                br.close();
-            } catch (IOException ex) {
-                Logger.getLogger(SemanticEvaluation.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
-        /*System.out.println("Printing...");
-         for(String str:dictionaryWords.keySet()){
-         System.out.println("Entry: "+str+" "+dictionaryWords.get(str));
-         }*/
-        //System.out.println("Dictionary Size: "+dictionaryWords.size());
-        //process doc term matrix
-        BufferedReader brDT = null;
+
         try {
-            ////////dictionaryWords = new HashMap<>();
-            String line = null;
-            brDT = new BufferedReader(new FileReader("data/mutual_info_data/bbcTermDocMatrix.txt"));
-            //System.out.println("Added file path: "+filePath);
+            String line;
+            br = new BufferedReader(new FileReader("data/mutual_info_data/bbcTermDocMatrix.txt"));
             int countRow = 0;
-            while ((line = brDT.readLine()) != null) {
+            while ((line = br.readLine()) != null) {
                 String[] tokens = line.split(" ");
-                //System.out.println("token length: "+tokens.length);
                 for (int k = 0; k < tokens.length; k++) {
                     termDocMatrix[countRow][k] = Integer.parseInt(tokens[k]);
                 }
-
                 countRow++;
             }
-        } catch (Exception ex) {
+            br.close();
+        } catch (IOException | NumberFormatException ex) {
             Logger.getLogger(SemanticEvaluation.class.getName()).log(Level.SEVERE, null, ex);
-        } finally {
-            try {
-                brDT.close();
-            } catch (IOException ex) {
-                Logger.getLogger(SemanticEvaluation.class.getName()).log(Level.SEVERE, null, ex);
-            }
         }
-        /*for(int i=0;i<termDocMatrix.length;i++){
-         for(int j=0;j<termDocMatrix[0].length;j++){
-         System.out.print(termDocMatrix[i][j]+" ");
-         }
-         System.out.println();
-         }*/
     }
 
-    private double getProbFromTDMatrix(String query) {
+    private double getProbFromTermDocMatrix(String query) {
         double probQuery = 0;
         try {
-            // System.out.println("Originla one:"+query);
             if (query.isEmpty()) {
                 return 0;
             }
             Query textQuery = parser.parse(QueryParser.escape(query));
-            // System.out.println("AFter QueryParser:"+textQuery.toString());
             String tokens[] = textQuery.toString().trim().split(" ");
             int docFreqCount = 0;
             for (int docIndex = 0; docIndex < termDocMatrix[0].length; docIndex++) {
                 boolean foundFlag = true;
-                for (int i = 0; i < tokens.length; i++) {
-                    //get number
-                    Integer termIndex = dictionaryWords.get(tokens[i]);
+                for (String token : tokens) {
+                    Integer termIndex = dictionaryWords.get(token);
                     if (termIndex != null) {
-
-                        //  System.out.println("Luck Found index:"+termIndex);
                         boolean checkbound = true;
                         if (termIndex > termDocMatrix.length && docIndex > termDocMatrix[0].length) {
                             checkbound = false;
@@ -159,10 +85,7 @@ public class SemanticEvaluation {
                             foundFlag = false;
                             break;
                         }
-                        // System.out.println("Luck Found");
                     } else {
-
-                        //System.out.println("Dic Size:="+dictionaryWords.size());
                         foundFlag = false;
                         totalNotinDic++;
                         break;
@@ -172,7 +95,7 @@ public class SemanticEvaluation {
                     docFreqCount++;
                 }
             }
-            probQuery = (docFreqCount * 1.0) / totalDoc;
+            probQuery = (docFreqCount * 1.0) / 2225;
         } catch (ParseException ex) {
             Logger.getLogger(SemanticEvaluation.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -180,64 +103,40 @@ public class SemanticEvaluation {
     }
 
     public double calculatePEL(ArrayList<String> origQuery, ArrayList<String> coverQuery) {
-        //calculate probability
-        // getProbFromTDMatrix
         HashMap<String, Double> Px = new HashMap<>();
         HashMap<String, Double> Py = new HashMap<>();
         HashMap<String, Double> Pxy = new HashMap<>();
-        for (int ix = 0; ix < origQuery.size(); ix++) {
-            String qr = origQuery.get(ix);
-            double prob = getProbFromTDMatrix(qr);
+        for (String qr : origQuery) {
+            double prob = getProbFromTermDocMatrix(qr);
             Px.put(qr, prob);
-            //System.out.println("X Prob:"+qr+" "+prob);
-
         }
-        for (int iy = 0; iy < coverQuery.size(); iy++) {
-            String qr = coverQuery.get(iy);
-            double prob = getProbFromTDMatrix(qr);
+        for (String qr : coverQuery) {
+            double prob = getProbFromTermDocMatrix(qr);
             Py.put(qr, prob);
-            //System.out.println("Y Prob:"+qr+" "+prob);
-
         }
         //create P(x,y)
-        for (int ix = 0; ix < origQuery.size(); ix++) {
-            for (int iy = 0; iy < coverQuery.size(); iy++) {
-                String combineQuery = origQuery.get(ix) + " " + coverQuery.get(iy);
-                double prob = getProbFromTDMatrix(combineQuery);
+        for (String origQuery1 : origQuery) {
+            for (String coverQuery1 : coverQuery) {
+                String combineQuery = origQuery1 + " " + coverQuery1;
+                double prob = getProbFromTermDocMatrix(combineQuery);
                 Pxy.put(combineQuery, prob);
-                //System.out.println("XY Prob:"+combineQuery+" "+prob);
             }
         }
         //mutual info
         double muInfo = 0;
-        int toatlMatch = 0;
-        int totalUNMatch = 0;
-        for (int ix = 0; ix < origQuery.size(); ix++) {
-            for (int iy = 0; iy < coverQuery.size(); iy++) {
-                String combineQuery = origQuery.get(ix) + " " + coverQuery.get(iy);
+        for (String origQuery1 : origQuery) {
+            for (String coverQuery1 : coverQuery) {
+                String combineQuery = origQuery1 + " " + coverQuery1;
                 double pxy = Pxy.get(combineQuery);
-                double px = Px.get(origQuery.get(ix));
-                double py = Py.get(coverQuery.get(iy));
+                double px = Px.get(origQuery1);
+                double py = Py.get(coverQuery1);
                 if (pxy > 0 && px > 0 && py > 0) {
-                    //System.out.println("Got one match");
-                    toatlMatch++;
                     double partER = pxy * ((Math.log10(pxy / (px * py))) / Math.log10(2));
                     muInfo += partER;
-                    //System.out.println("partER:="+partER);
-                    //System.out.println("mutualER:="+muInfo);
-                } else {
-                    totalUNMatch++;
-                    //System.out.println("px,py,pxy all are not non-zero. Not found");
                 }
             }
         }
-
         return muInfo;
-    }
-
-    //Please implement P@K, MRR and NDCG accordingly
-    public static void main(String[] args) throws Throwable {
-
     }
 
 }
