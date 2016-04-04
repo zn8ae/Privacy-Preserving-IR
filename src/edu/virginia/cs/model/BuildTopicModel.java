@@ -7,6 +7,7 @@ package edu.virginia.cs.model;
 
 import edu.virginia.cs.utility.SpecialAnalyzer;
 import edu.virginia.cs.utility.FileOperations;
+import edu.virginia.cs.utility.StringTokenizer;
 import java.io.File;
 import java.io.IOException;
 import java.util.Collections;
@@ -14,13 +15,7 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.queryparser.classic.QueryParser;
 import org.apache.lucene.search.BooleanQuery;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.util.Version;
 
 /**
  *
@@ -28,73 +23,78 @@ import org.apache.lucene.util.Version;
  */
 public class BuildTopicModel {
 
-    private HashMap<String, Integer> dictionary;
-    private HashMap<String, Integer> dictionaryWithTF;
+    private final HashMap<String, Integer> dictionary;
+    private final HashMap<String, Integer> dictionaryWithTF;
     private int numberOfWordsInDictionary = 0;
-    private FileOperations fiop;
-    private SpecialAnalyzer analyzer;
-    private QueryParser parser;
+    private final FileOperations fiop;
+    private final SpecialAnalyzer analyzer;
 
     public BuildTopicModel() throws IOException {
         fiop = new FileOperations();
         dictionary = new HashMap<>();
         dictionaryWithTF = new HashMap<>();
         analyzer = new SpecialAnalyzer();
-        parser = new QueryParser(Version.LUCENE_46, "", analyzer);
         BooleanQuery.setMaxClauseCount(2048);
     }
 
+    /**
+     * Method that analyzes a document.
+     *
+     * @param document unsorted Map
+     * @throws java.io.IOException
+     */
     private void analyzeDocument(String document) throws IOException {
         HashMap<String, Integer> tempRecord = new HashMap<>();
-        Query textQuery;
         String previousToken = "";
-        try {
-            textQuery = parser.parse(parser.escape(document));
-            String[] tokens = textQuery.toString().split(" ");
-            for (String token : tokens) {
-                if (!token.isEmpty()) {
-                    if (!dictionary.containsKey(token)) {
-                        dictionary.put(token, numberOfWordsInDictionary);
+        List<String> tokens = StringTokenizer.TokenizeString(document);
+        for (String token : tokens) {
+            if (!token.isEmpty()) {
+                if (!dictionary.containsKey(token)) {
+                    dictionary.put(token, numberOfWordsInDictionary);
+                    numberOfWordsInDictionary++;
+                }
+                if (tempRecord.containsKey(token)) {
+                    tempRecord.put(token, tempRecord.get(token) + 1);
+                } else {
+                    tempRecord.put(token, 1);
+                }
+                // generating bigrams
+                if (!previousToken.isEmpty()) {
+                    String bigram = previousToken + " " + token;
+                    if (!dictionary.containsKey(bigram)) {
+                        dictionary.put(bigram, numberOfWordsInDictionary);
                         numberOfWordsInDictionary++;
                     }
-                    if (tempRecord.containsKey(token)) {
-                        tempRecord.put(token, tempRecord.get(token) + 1);
+                    if (tempRecord.containsKey(bigram)) {
+                        tempRecord.put(bigram, tempRecord.get(bigram) + 1);
                     } else {
-                        tempRecord.put(token, 1);
+                        tempRecord.put(bigram, 1);
                     }
-                    // generating bigrams
-                    if (!previousToken.isEmpty()) {
-                        String bigram = previousToken + " " + token;
-                        if (!dictionary.containsKey(bigram)) {
-                            dictionary.put(bigram, numberOfWordsInDictionary);
-                            numberOfWordsInDictionary++;
-                        }
-                        if (tempRecord.containsKey(bigram)) {
-                            tempRecord.put(bigram, tempRecord.get(bigram) + 1);
-                        } else {
-                            tempRecord.put(bigram, 1);
-                        }
-                    }
+                }
 
-                    previousToken = token;
-                }
+                previousToken = token;
             }
-            String line = String.valueOf(tempRecord.size());
-            for (Map.Entry<String, Integer> entry : tempRecord.entrySet()) {
-                line = line + " " + dictionary.get(entry.getKey()) + ":" + entry.getValue();
-                if (dictionaryWithTF.containsKey(entry.getKey())) {
-                    int tempFreq = entry.getValue() + dictionaryWithTF.get(entry.getKey());
-                    dictionaryWithTF.put(entry.getKey(), tempFreq);
-                } else {
-                    dictionaryWithTF.put(entry.getKey(), entry.getValue());
-                }
-            }
-            fiop.appnedToFile("documentRecord.dat", line);
-        } catch (ParseException ex) {
-            Logger.getLogger(BuildTopicModel.class.getName()).log(Level.SEVERE, null, ex);
         }
+        String line = String.valueOf(tempRecord.size());
+        for (Map.Entry<String, Integer> entry : tempRecord.entrySet()) {
+            line = line + " " + dictionary.get(entry.getKey()) + ":" + entry.getValue();
+            if (dictionaryWithTF.containsKey(entry.getKey())) {
+                int tempFreq = entry.getValue() + dictionaryWithTF.get(entry.getKey());
+                dictionaryWithTF.put(entry.getKey(), tempFreq);
+            } else {
+                dictionaryWithTF.put(entry.getKey(), entry.getValue());
+            }
+        }
+        fiop.appnedToFile("documentRecord.dat", line);
+
     }
 
+    /**
+     * Method that loads all the documents from a directory.
+     *
+     * @param folder path of the directory
+     * @throws java.Throwable
+     */
     private void LoadDirectory(String folder) throws Throwable {
         int numberOfDocumentsLoaded = 0;
         File dir = new File(folder);
@@ -111,6 +111,13 @@ public class BuildTopicModel {
         writeDictionaryToFile("dictionaryWithFrequency.txt", 2);
     }
 
+    /**
+     * Method that generate the id of all users for evaluation.
+     *
+     * @param unsortMap unsorted Map
+     * @param order if true, then sort in ascending order, otherwise in
+     * descending order
+     */
     private void sortByComparator(HashMap<String, Integer> unsortedMap, boolean order, String filename, int choice) throws Throwable {
         List<Map.Entry<String, Integer>> list = new LinkedList<>(unsortedMap.entrySet());
         Collections.sort(list, (Map.Entry<String, Integer> o1, Map.Entry<String, Integer> o2) -> {
@@ -124,6 +131,13 @@ public class BuildTopicModel {
         fiop.appnedToFile(filename, list, choice);
     }
 
+    /**
+     * Method that stores the dictionary into file.
+     *
+     * @param filename
+     * @param choice if choice = 1, then store only words, otherwise store words
+     * with term frequency
+     */
     private void writeDictionaryToFile(String filename, int choice) throws Throwable {
         if (choice == 1) {
             sortByComparator(dictionary, true, filename, choice);
@@ -132,6 +146,12 @@ public class BuildTopicModel {
         }
     }
 
+    /**
+     * Main method.
+     *
+     * @param args command line arguments
+     * @throws java.lang.Throwable
+     */
     public static void main(String[] args) throws Throwable {
         // TODO code application logic here
         BuildTopicModel tmodel = new BuildTopicModel();

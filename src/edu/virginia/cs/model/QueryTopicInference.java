@@ -5,8 +5,8 @@
  */
 package edu.virginia.cs.model;
 
-import edu.virginia.cs.utility.DocumentAnalyzer;
 import edu.virginia.cs.utility.FileOperations;
+import edu.virginia.cs.utility.SpecialAnalyzer;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -15,6 +15,13 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.lucene.queryparser.classic.ParseException;
+import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.util.Version;
 
 /**
  *
@@ -22,14 +29,16 @@ import java.util.HashMap;
  */
 public class QueryTopicInference {
 
-    private HashMap<String, Integer> dictionary;
-    private FileOperations fiop;
-    private DocumentAnalyzer analyzer;
+    private final HashMap<String, Integer> dictionary;
+    private final FileOperations fiop;
+    private final SpecialAnalyzer analyzer;
+    private final QueryParser parser;
 
     public QueryTopicInference() throws IOException {
         fiop = new FileOperations();
-        analyzer = new DocumentAnalyzer();
         dictionary = new HashMap<>();
+        analyzer = new SpecialAnalyzer();
+        parser = new QueryParser(Version.LUCENE_46, "", analyzer);
     }
 
     private void LoadDictionary(String filename) {
@@ -41,18 +50,19 @@ public class QueryTopicInference {
         }
     }
 
+    /**
+     * Method that run topic model to infer topic of the user submitted query.
+     *
+     * @throws java.io.IOException
+     */
     private void runTopicInference() throws IOException {
         String command = "lda-win64 inf settings.txt topic_model/final query.dat result";
- //       String command = "lda-linux64 inf settings.txt topic_model/final query.dat result"; // for linux
         Process proc = Runtime.getRuntime().exec(command);
         BufferedReader stdInput = new BufferedReader(new InputStreamReader(proc.getInputStream()));
         BufferedReader stdError = new BufferedReader(new InputStreamReader(proc.getErrorStream()));
 
-        // read the output from the command
-//        System.out.println("\nHere is the standard output of the command:\n");
-        String s = null;
+        String s;
         while ((s = stdInput.readLine()) != null) {
-//            System.out.println(s);
         }
 
         // read any errors from the attempted command
@@ -66,41 +76,82 @@ public class QueryTopicInference {
         }
     }
 
+    /**
+     * Method that pre-process all the queries of a user.
+     *
+     * @param allQueries list of all query of a user
+     * @throws java.io.IOException
+     */
     private void ProcessQueryLog(ArrayList<String> allQueries) throws IOException {
         File file = new File("query.dat");
         BufferedWriter bw = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
         for (String query : allQueries) {
-            String processedResult = analyzer.ProcessDocument(query);
+            String processedResult = ProcessDocument(query);
             bw.write(processedResult + "\n");
         }
         bw.close();
     }
 
+    /**
+     * Method that pre-process and run the topic inference for the user query.
+     *
+     * @param query
+     * @throws java.io.IOException
+     */
     public void ProcessQuery(String query) throws IOException {
         File file = new File("query.dat");
         BufferedWriter bw = new BufferedWriter(new FileWriter(file.getAbsolutePath()));
-        String processedResult = analyzer.ProcessDocument(query);
+        String processedResult = ProcessDocument(query);
         bw.write(processedResult + "\n");
         bw.close();
         runTopicInference();
     }
 
+    /**
+     * Method that pre-process and run the topic inference for all the queries
+     * of a user.
+     *
+     * @param allQueries list of all query of a user
+     * @throws java.io.IOException
+     */
     public void initializeGeneration(ArrayList<String> allQueries) throws IOException {
         LoadDictionary("dictionary.txt");
-        analyzer.SetDictionary(dictionary);
         ProcessQueryLog(allQueries);
         runTopicInference();
     }
 
-    public void initializeGenerationForRunner() throws IOException {
-        LoadDictionary("dictionary.txt");
-        analyzer.SetDictionary(dictionary);
-    }
-
     /**
-     * @param args the command line arguments
+     * The main method that creates and starts threads.
+     *
+     * @param document
+     * @return one line representation of the user query
+     * @throws java.io.IOException
      */
-    public static void main(String[] args) {
-        // TODO code application logic here
+    public String ProcessDocument(String document) throws IOException {
+        String line = null;
+        try {
+            HashMap<String, Integer> tempRecord = new HashMap<>();
+            Query textQuery = parser.parse(QueryParser.escape(document));
+            String[] tokens = textQuery.toString().split(" ");
+            for (String token : tokens) {
+                if (!token.isEmpty()) {
+                    if (dictionary.containsKey(token)) {
+                        if (tempRecord.containsKey(token)) {
+                            tempRecord.put(token, tempRecord.get(token) + 1);
+                        } else {
+                            tempRecord.put(token, 1);
+                        }
+                    }
+                }
+            }
+            line = String.valueOf(tempRecord.size());
+            for (Map.Entry<String, Integer> entry : tempRecord.entrySet()) {
+                line = line + " " + dictionary.get(entry.getKey()) + ":" + entry.getValue();
+            }
+
+        } catch (ParseException ex) {
+            Logger.getLogger(QueryTopicInference.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        return line;
     }
 }
