@@ -55,8 +55,6 @@ public class ProfileBuilder {
                 ArrayList<String> record = userProfile.get(entry.getKey());
                 System.out.println(record.size());
                 String fileName = "data/second_top_" + top + "_user_profiles/" + entry.getKey() + ".txt";
-//                String trainFilename = "data/user_profiles/train/" + entry.getKey() + ".txt";
-//                String testFilename = "data/user_profiles/test/" + entry.getKey() + ".txt";
                 for (String str : record) {
                     String[] words = str.split("::");
                     String[] time = words[2].split(" ");
@@ -69,7 +67,6 @@ public class ProfileBuilder {
     }
 
     private void generateUserProfile(String content) {
-//        System.out.println("Generating user profile");
         String lines[] = content.split("[\\r\\n]+");
         boolean flag = true;
         for (String line : lines) {
